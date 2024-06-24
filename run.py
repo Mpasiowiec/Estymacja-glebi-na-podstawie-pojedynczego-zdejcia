@@ -1,23 +1,3 @@
-# Copyright 2023 Bingxin Ke, ETH Zurich. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# --------------------------------------------------------------------------
-# If you find this code useful, we kindly ask you to cite our paper in your work.
-# Please find bibtex at: https://github.com/prs-eth/Marigold#-citation
-# More information about the method can be found at https://marigoldmonodepth.github.io
-# --------------------------------------------------------------------------
-
-
 import argparse
 import logging
 import os
@@ -28,127 +8,38 @@ import torch
 from PIL import Image
 from tqdm.auto import tqdm
 
-from marigold import MarigoldPipeline
+from models.Marigold import MarigoldPipeline
 
 EXTENSION_LIST = [".jpg", ".jpeg", ".png"]
 
 
 if "__main__" == __name__:
+    
     logging.basicConfig(level=logging.INFO)
 
     # -------------------- Arguments --------------------
-    parser = argparse.ArgumentParser(
-        description="Run single-image depth estimation using Marigold."
-    )
-    parser.add_argument(
-        "--checkpoint",
-        type=str,
-        default="prs-eth/marigold-lcm-v1-0",
-        help="Checkpoint path or hub name.",
-    )
+    checkpoint_path = "prs-eth/marigold-lcm-v1-0"
+    input_rgb_dir = "C:/Users/micha/Desktop"
+    output_dir = "./"
 
-    parser.add_argument(
-        "--input_rgb_dir",
-        type=str,
-        required=True,
-        help="Path to the input image folder.",
-    )
-
-    parser.add_argument(
-        "--output_dir", type=str, required=True, help="Output directory."
-    )
-
-    # inference setting
-    parser.add_argument(
-        "--denoise_steps",
-        type=int,
-        default=None,
-        help="Diffusion denoising steps, more steps results in higher accuracy but slower inference speed. For the original (DDIM) version, it's recommended to use 10-50 steps, while for LCM 1-4 steps.",
-    )
-    parser.add_argument(
-        "--ensemble_size",
-        type=int,
-        default=5,
-        help="Number of predictions to be ensembled, more inference gives better results but runs slower.",
-    )
-    parser.add_argument(
-        "--half_precision",
-        "--fp16",
-        action="store_true",
-        help="Run with half-precision (16-bit float), might lead to suboptimal result.",
-    )
-
-    # resolution setting
-    parser.add_argument(
-        "--processing_res",
-        type=int,
-        default=None,
-        help="Maximum resolution of processing. 0 for using input image resolution. Default: 768.",
-    )
-    parser.add_argument(
-        "--output_processing_res",
-        action="store_true",
-        help="When input is resized, out put depth at resized operating resolution. Default: False.",
-    )
-    parser.add_argument(
-        "--resample_method",
-        choices=["bilinear", "bicubic", "nearest"],
-        default="bilinear",
-        help="Resampling method used to resize images and depth predictions. This can be one of `bilinear`, `bicubic` or `nearest`. Default: `bilinear`",
-    )
-
-    # depth map colormap
-    parser.add_argument(
-        "--color_map",
-        type=str,
-        default="Spectral",
-        help="Colormap used to render depth predictions.",
-    )
-
-    # other settings
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=None,
-        help="Reproducibility seed. Set to `None` for unseeded inference.",
-    )
-
-    parser.add_argument(
-        "--batch_size",
-        type=int,
-        default=0,
-        help="Inference batch size. Default: 0 (will be set automatically).",
-    )
-    parser.add_argument(
-        "--apple_silicon",
-        action="store_true",
-        help="Flag of running on Apple Silicon.",
-    )
-
-    args = parser.parse_args()
-
-    checkpoint_path = args.checkpoint
-    input_rgb_dir = args.input_rgb_dir
-    output_dir = args.output_dir
-
-    denoise_steps = args.denoise_steps
-    ensemble_size = args.ensemble_size
+    denoise_steps = 10
+    ensemble_size = 5
     if ensemble_size > 15:
         logging.warning("Running with large ensemble size will be slow.")
-    half_precision = args.half_precision
+    half_precision = True
 
-    processing_res = args.processing_res
-    match_input_res = not args.output_processing_res
+    processing_res = 256
+    match_input_res = True
     if 0 == processing_res and match_input_res is False:
         logging.warning(
             "Processing at native resolution without resizing output might NOT lead to exactly the same resolution, due to the padding and pooling properties of conv layers."
         )
-    resample_method = args.resample_method
+    resample_method = "bilinear" # ["bilinear", "bicubic", "nearest"]
 
-    color_map = args.color_map
-    seed = args.seed
-    batch_size = args.batch_size
-    apple_silicon = args.apple_silicon
+    color_map = "Spectral"
+    seed = None
+    batch_size = 0
+    apple_silicon = False
     if apple_silicon and 0 == batch_size:
         batch_size = 1  # set default batchsize
 
