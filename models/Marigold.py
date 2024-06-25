@@ -59,16 +59,19 @@ class MarigoldDepthOutput(BaseOutput):
     depth_colored: Union[None, Image.Image]
     uncertainty: Union[None, np.ndarray]
 
-# from models.Marigold import MarigoldPipeline
-# import torch
-
-# pipe = MarigoldPipeline.from_pretrained("prs-eth/marigold-depth-lcm-v1-0", variant="fp16", torch_dtype=torch.float16)
-
-# ag = vars(pipe)
-# ag.pop('_internal_dict')
-
-# model = MarigoldPipeline(ag['unet'], ag['vae'], ag['scheduler'], ag['text_encoder'], ag['tokenizer'], ag['scale_invariant'], ag['shift_invariant'], ag['default_denoising_steps'], ag['default_processing_resolution'], ag['empty_text_embed'])
-# model
+def get_Marigold_untraind():
+    ag = vars(MarigoldPipeline.from_pretrained("prs-eth/marigold-depth-lcm-v1-0", variant="fp16", torch_dtype=torch.float16))
+    model = MarigoldPipeline(diffusers.UNet2DConditionModel(**vars(ag['unet'])['_internal_dict']),
+                         ag['vae'],
+                         ag['scheduler'],
+                         ag['text_encoder'],
+                         ag['tokenizer'],
+                         ag['scale_invariant'],
+                         ag['shift_invariant'],
+                         ag['default_denoising_steps'],
+                         ag['default_processing_resolution'],
+                         ag['empty_text_embed'])
+    return model
 
 class MarigoldPipeline(DiffusionPipeline):
     """
