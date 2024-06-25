@@ -61,7 +61,7 @@ class MarigoldDepthOutput(BaseOutput):
 
 def get_Marigold_untraind():
     ag = vars(MarigoldPipeline.from_pretrained("prs-eth/marigold-depth-lcm-v1-0", variant="fp16", torch_dtype=torch.float16))
-    model = MarigoldPipeline(diffusers.UNet2DConditionModel(**vars(ag['unet'])['_internal_dict']),
+    model = MarigoldPipeline(UNet2DConditionModel(**vars(ag['unet'])['_internal_dict']),
                          ag['vae'],
                          ag['scheduler'],
                          ag['text_encoder'],
