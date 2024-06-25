@@ -59,9 +59,15 @@ class MarigoldDepthOutput(BaseOutput):
     depth_colored: Union[None, Image.Image]
     uncertainty: Union[None, np.ndarray]
 
-def get_Marigold_untraind():
-    ag = vars(MarigoldPipeline.from_pretrained("prs-eth/marigold-depth-lcm-v1-0", variant="fp16", torch_dtype=torch.float16))
-    model = MarigoldPipeline(UNet2DConditionModel(**vars(ag['unet'])['_internal_dict']),
+def get_Marigold_untrained(trained=False, variant=None, torch_dtype=torch.float32):
+
+    pipe = MarigoldPipeline.from_pretrained("prs-eth/marigold-depth-lcm-v1-0", variant=None, torch_dtype=torch.float32)
+    
+    if trained:
+      return pipe
+    else:
+      ag = vars(pipe)
+      model = MarigoldPipeline(UNet2DConditionModel(**vars(ag['unet'])['_internal_dict']),
                          ag['vae'],
                          ag['scheduler'],
                          ag['text_encoder'],

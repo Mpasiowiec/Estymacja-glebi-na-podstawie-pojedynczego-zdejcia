@@ -8,7 +8,7 @@ import torch
 from PIL import Image
 from tqdm.auto import tqdm
 
-from models.Marigold import MarigoldPipeline
+from models.Marigold import MarigoldPipeline, get_Marigold_untrained
 
 EXTENSION_LIST = [".jpg", ".jpeg", ".png"]
 
@@ -19,11 +19,11 @@ if "__main__" == __name__:
 
     # -------------------- Arguments --------------------
     checkpoint_path = "prs-eth/marigold-lcm-v1-0"
-    input_rgb_dir = "C:/Users/micha/Desktop"
+    input_rgb_dir = "/content"
     output_dir = "./"
 
-    denoise_steps = 10
-    ensemble_size = 5
+    denoise_steps = 5
+    ensemble_size = 7
     if ensemble_size > 15:
         logging.warning("Running with large ensemble size will be slow.")
     half_precision = True
@@ -93,9 +93,7 @@ if "__main__" == __name__:
         dtype = torch.float32
         variant = None
 
-    pipe: MarigoldPipeline = MarigoldPipeline.from_pretrained(
-        checkpoint_path, variant=variant, torch_dtype=dtype
-    )
+    pipe: MarigoldPipeline = get_Marigold_untrained(trained = True, variant=variant, torch_dtype=dtype)
 
     try:
         pipe.enable_xformers_memory_efficient_attention()
