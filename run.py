@@ -8,7 +8,7 @@ import torch
 from PIL import Image
 from tqdm.auto import tqdm
 
-from models.Marigold import MarigoldPipeline, get_Marigold_untrained
+from models.Marigold import MarigoldPipeline, get_Marigold
 
 EXTENSION_LIST = [".jpg", ".jpeg", ".png"]
 
@@ -19,16 +19,16 @@ if "__main__" == __name__:
 
     # -------------------- Arguments --------------------
     checkpoint_path = "prs-eth/marigold-lcm-v1-0"
-    input_rgb_dir = "/content"
-    output_dir = "./"
+    input_rgb_dir = "./"
+    output_dir = "/content/output"
 
-    denoise_steps = 5
-    ensemble_size = 7
+    denoise_steps = 10
+    ensemble_size = 5
     if ensemble_size > 15:
         logging.warning("Running with large ensemble size will be slow.")
     half_precision = True
 
-    processing_res = 256
+    processing_res = 768
     match_input_res = True
     if 0 == processing_res and match_input_res is False:
         logging.warning(
@@ -93,7 +93,7 @@ if "__main__" == __name__:
         dtype = torch.float32
         variant = None
 
-    pipe: MarigoldPipeline = get_Marigold_untrained(trained = True, variant=variant, torch_dtype=dtype)
+    pipe: MarigoldPipeline = get_Marigold(trained = False, variant=variant, torch_dtype=dtype)
 
     try:
         pipe.enable_xformers_memory_efficient_attention()
@@ -119,7 +119,7 @@ if "__main__" == __name__:
     with torch.no_grad():
         os.makedirs(output_dir, exist_ok=True)
 
-        for rgb_path in tqdm(rgb_filename_list, desc="Estimating depth", leave=True):
+        for rgb_path in tqdm(rgb_filename_list, desc="Estimating depth", leave=False):
             # Read input image
             input_image = Image.open(rgb_path)
 
