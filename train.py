@@ -42,15 +42,15 @@ from PIL import Image
 
 from models.Marigold import MarigoldPipeline, MarigoldDepthOutput
 
-from src.util import metric
-from src.util.data_loader import skip_first_batches
-from src.util.logging_util import tb_logger, eval_dic_to_text
-from src.util.loss import get_loss
-from src.util.lr_scheduler import IterExponential
-from src.util.metric import MetricTracker
-from src.util.multi_res_noise import multi_res_noise_like
-from src.util.alignment import align_depth_least_square
-from src.util.seeding import generate_seed_sequence
+from util import metric
+from util.data_loader import skip_first_batches
+from util.logging_util import tb_logger, eval_dic_to_text
+from util.loss import get_loss
+from util.lr_scheduler import IterExponential
+from util.metric import MetricTracker
+from util.multi_res_noise import multi_res_noise_like
+from util.alignment import align_depth_least_square
+from util.seeding import generate_seed_sequence
 
 
 class MarigoldTrainer:
