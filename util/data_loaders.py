@@ -90,33 +90,33 @@ class VKITTI2(Dataset):
 
         # If train test split is not created, then create one.
         # Split is such that 10% of the frames from each scene are used for testing and validation.
-        if not os.path.exists(os.path.join(data_dir_root, "train.txt")):
+        if not os.path.exists(os.path.join(data_dir_root, "vkitti2_train.txt")):
             import random
             import glob
-            
+
             # image paths are of the form <data_dir_root>/vkitti_2.0.3_<rgb,depth>/<scene>/<variant>/frames/<rgb,depth>/Camera<0,1>/<rgb,depth>_{}.<jpg,png>
-            self.image_files = glob.glob(os.path.join(data_dir_root, "vkitti_2.0.3_rgb", "**", "frames", "rgb", "Camera_0", '*.jpg'), recursive=True)
+            self.image_files = glob.glob(os.path.join("/content/drive/MyDrive/magisterka/dane/vkitti2", "vkitti_2.0.3_rgb", "*", "*", "frames", "rgb", "*", '*.jpg'), recursive=True)
             self.depth_files = [r.replace("rgb", "depth").replace(".jpg", ".png") for r in self.image_files]
         
-            scenes = set([f.split('\\')[-6] for f in self.image_files])
+            scenes = set([f.split('/')[-6] for f in self.image_files])
             train_files = []
             valid_files = []
             test_files = []
             for scene in scenes:
-                scene_files = [f for f in self.image_files if f.split('\\')[-6] == scene]
+                scene_files = [f for f in self.image_files if f.split('/')[-6] == scene]
                 random.shuffle(scene_files)
                 train_files.extend(scene_files[:int(len(scene_files) * 0.8)])
                 valid_files.extend(scene_files[int(len(scene_files) * 0.8):int(len(scene_files) * 0.9)])
                 test_files.extend(scene_files[int(len(scene_files) * 0.9):])
-            with open(os.path.join(data_dir_root, "train.txt"), "w") as f:
+            with open(os.path.join(data_dir_root, "vkitti2_train.txt"), "w") as f:
                 f.write("\n".join(train_files))
-            with open(os.path.join(data_dir_root, "valid.txt"), "w") as f:
+            with open(os.path.join(data_dir_root, "vkitti2_valid.txt"), "w") as f:
                 f.write("\n".join(valid_files))
-            with open(os.path.join(data_dir_root, "test.txt"), "w") as f:
+            with open(os.path.join(data_dir_root, "vkitti2_test.txt"), "w") as f:
                 f.write("\n".join(test_files))
 
         
-        with open(os.path.join(data_dir_root, split+".txt"), "r") as f:
+        with open(os.path.join(data_dir_root, "vkitti2_"+split+".txt"), "r") as f:
             self.image_files = f.read().splitlines()
         self.depth_files = [r.replace("rgb", "depth").replace(".jpg", ".png") for r in self.image_files]
 
@@ -177,13 +177,13 @@ class NYU2(Dataset):
         self.transform = ToTensor(data_name="nyu_2")
 
         # image paths are of the form <data_dir_root>/<rgb,depth>/{}.<jpg,png>
-        if not os.path.exists(os.path.join(data_dir_root, "paths.txt")):
+        if not os.path.exists(os.path.join(data_dir_root, "nyu_2_paths.txt")):
             import glob
-            self.image_files = glob.glob(os.path.join(data_dir_root, "rgb", '*.jpg'), recursive=True)
-            with open(os.path.join(data_dir_root, "paths.txt"), "w") as f:
+            self.image_files = glob.glob(os.path.join("/content/drive/MyDrive/magisterka/dane/nyu_v2", "rgb", '*.jpg'), recursive=True)
+            with open(os.path.join(data_dir_root, "nyu_2_paths.txt"), "w") as f:
                 f.write("\n".join(self.image_files))
         else:
-            with open(os.path.join(data_dir_root, "paths.txt"), "r") as f:
+            with open(os.path.join(data_dir_root, "nyu_2_paths.txt"), "r") as f:
                 self.image_files = f.read().splitlines()
         self.depth_files = [r.replace("rgb", "depth").replace(".jpg", ".png") for r in self.image_files]
 
@@ -230,13 +230,13 @@ class KITTI(Dataset):
         self.transform = ToTensor(data_name="kitti")
 
         # image paths are of the form <data_dir_root>\<raw_data,data_depth_annotated>\<scene>\<image_02\data, proj_depth\groundtruth\image_02>\{}.png
-        if not os.path.exists(os.path.join(data_dir_root, "paths.txt")):
+        if not os.path.exists(os.path.join(data_dir_root, "kitti_paths.txt")):
             import glob
-            self.image_files = glob.glob(os.path.join(data_dir_root, "raw_data", '*', 'image_02', 'data', '*.png'), recursive=True)
-            with open(os.path.join(data_dir_root, "paths.txt"), "w") as f:
+            self.image_files = glob.glob(os.path.join("/content/drive/MyDrive/magisterka/dane/kitti", "raw_data", '*', 'image_02', 'data', '*.png'), recursive=True)
+            with open(os.path.join(data_dir_root, "kitti_paths.txt"), "w") as f:
                 f.write("\n".join(self.image_files))
         else:
-            with open(os.path.join(data_dir_root, "paths.txt"), "r") as f:
+            with open(os.path.join(data_dir_root, "kitti_paths.txt"), "r") as f:
                 self.image_files = f.read().splitlines()
         self.depth_files = [r.replace("raw_data", "data_depth_annotated").replace("image_02\\data", "proj_depth\\groundtruth\\image_02") for r in self.image_files]
         
@@ -298,33 +298,33 @@ class HYPERSIM(Dataset):
 
         # If train test split is not created, then create one.
         # Split is such that 10% of the frames from each room are used for testing and validation.
-        if not os.path.exists(os.path.join(data_dir_root, "train.txt")):
+        if not os.path.exists(os.path.join(data_dir_root, "hypersim_train.txt")):
             import random
             import glob
             
             # image paths are of the form <data_dir_root>/ai_*/images/scene_cam_00_<final_preview, geometry_hdf5>/frame.*.<color.jpg, depth_meters.png>
-            self.image_files = glob.glob(os.path.join(data_dir_root, 'data', 'ai_*', 'images', 'scene_cam_00_final_preview', 'frame.*.color.jpg'), recursive=True)
+            self.image_files = glob.glob(os.path.join("/content/drive/MyDrive/magisterka/dane/hypersim", 'data', 'ai_*', 'images', 'scene_cam_00_final_preview', 'frame.*.color.jpg'), recursive=True)
             self.depth_files = [r.replace("final_preview", "geometry_hdf5").replace("color.jpg", "depth_meters.png") for r in self.image_files]
                     
-            scenes = set([f.split('\\')[-4] for f in self.image_files])
+            scenes = set([f.split('/')[-4] for f in self.image_files])
             train_files = []
             valid_files = []
             test_files = []
             for scene in scenes:
-                scene_files = [f for f in self.image_files if f.split('\\')[-4] == scene]
+                scene_files = [f for f in self.image_files if f.split('/')[-4] == scene]
                 random.shuffle(scene_files)
                 train_files.extend(scene_files[:int(len(scene_files) * 0.8)])
                 valid_files.extend(scene_files[int(len(scene_files) * 0.8):int(len(scene_files) * 0.9)])
                 test_files.extend(scene_files[int(len(scene_files) * 0.9):])
-            with open(os.path.join(data_dir_root, "train.txt"), "w") as f:
+            with open(os.path.join(data_dir_root, "hypersim_train.txt"), "w") as f:
                 f.write("\n".join(train_files))
-            with open(os.path.join(data_dir_root, "valid.txt"), "w") as f:
+            with open(os.path.join(data_dir_root, "hypersim_valid.txt"), "w") as f:
                 f.write("\n".join(valid_files))
-            with open(os.path.join(data_dir_root, "test.txt"), "w") as f:
+            with open(os.path.join(data_dir_root, "hypersim_test.txt"), "w") as f:
                 f.write("\n".join(test_files))
 
 
-        with open(os.path.join(data_dir_root, split+".txt"), "r") as f:
+        with open(os.path.join(data_dir_root, "hypersim_"+split+".txt"), "r") as f:
             self.image_files = f.read().splitlines()
         self.depth_files = [r.replace("final_preview", "geometry_hdf5").replace("color.jpg", "depth_meters.png") for r in self.image_files]
 
