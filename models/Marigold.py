@@ -67,16 +67,17 @@ def get_Marigold(trained=False, variant=None, torch_dtype=torch.float32):
       return pipe
     else:
       ag = vars(pipe)
-      model = MarigoldPipeline(UNet2DConditionModel(**vars(ag['unet'])['_internal_dict']),
-                         ag['vae'],
-                         ag['scheduler'],
-                         ag['text_encoder'],
-                         ag['tokenizer'],
-                         ag['scale_invariant'],
-                         ag['shift_invariant'],
-                         ag['default_denoising_steps'],
-                         ag['default_processing_resolution'],
-                         ag['empty_text_embed'])
+      model = MarigoldPipeline(
+                        UNet2DConditionModel(**vars(ag['unet'])['_internal_dict']),
+                        ag['vae'],
+                        ag['scheduler'],
+                        ag['text_encoder'],
+                        ag['tokenizer'],
+                        ag['scale_invariant'],
+                        ag['shift_invariant'],
+                        ag['default_denoising_steps'],
+                        ag['default_processing_resolution'],
+                        ag['empty_text_embed'])
     return model
 
 class MarigoldPipeline(DiffusionPipeline):
