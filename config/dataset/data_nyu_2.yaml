@@ -1,0 +1,5 @@
+name: nyu_v2
+disp_name: nyu_v2
+dir: nyu_v2
+filenames: data_split/nyu_2_paths.txt
+eigen_valid_mask: true

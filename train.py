@@ -32,19 +32,19 @@ from omegaconf import OmegaConf
 from torch.utils.data import ConcatDataset, DataLoader
 from tqdm import tqdm
 
-from marigold.marigold_pipeline import MarigoldPipeline
-from src.dataset import BaseDepthDataset, DatasetMode, get_dataset
-from src.dataset.mixed_sampler import MixedBatchSampler
-from src.trainer import get_trainer_cls
-from src.util.config_util import (
+from models.Marigold import MarigoldPipeline
+from datasets import BaseDepthDataset, DatasetMode, get_dataset
+from datasets.mixed_sampler import MixedBatchSampler
+from trainers import get_trainer_cls
+from util.config_util import (
     find_value_in_omegaconf,
     recursive_load_config,
 )
-from src.util.depth_transform import (
+from util.depth_transform import (
     DepthNormalizerBase,
     get_depth_normalizer,
 )
-from src.util.logging_util import (
+from util.logging_util import (
     config_logging,
     init_wandb,
     load_wandb_job_id,
@@ -52,7 +52,6 @@ from src.util.logging_util import (
     save_wandb_job_id,
     tb_logger,
 )
-from src.util.slurm_util import get_local_scratch_dir, is_on_slurm
 
 if "__main__" == __name__:
     t_start = datetime.now()
@@ -73,7 +72,10 @@ if "__main__" == __name__:
         help="Path of checkpoint to be resumed. If given, will ignore --config, and checkpoint in the config",
     )
     parser.add_argument(
-        "--output_dir", type=str, default=None, help="directory to save checkpoints"
+        "--output_dir",
+        type=str,
+        default="/content",
+        help="directory to save checkpoints"
     )
     parser.add_argument("--no_cuda", action="store_true", help="Do not use cuda.")
     parser.add_argument(
@@ -89,17 +91,20 @@ if "__main__" == __name__:
         help="On Slurm cluster, do not copy data to local scratch",
     )
     parser.add_argument(
-        "--base_data_dir", type=str, default=None, help="directory of training data"
+        "--base_data_dir",
+        type=str,
+        default="/content/drive/MyDrive/magisterka/dane/vkitti2",
+        help="directory of training data"
     )
     parser.add_argument(
         "--base_ckpt_dir",
         type=str,
-        default=None,
+        default="/content/drive/MyDrive/magisterka/ckp",
         help="directory of pretrained checkpoint",
     )
     parser.add_argument(
         "--add_datetime_prefix",
-        action="store_true",
+        action="store_false",
         help="Add datetime to the output folder name",
     )
 
@@ -211,26 +216,6 @@ if "__main__" == __name__:
         os.system(f"rm -rf {_temp_code_dir}")
         logging.info(f"Code snapshot saved to: {_code_snapshot_path}")
 
-    # -------------------- Copy data to local scratch (Slurm) --------------------
-    if is_on_slurm() and (not args.do_not_copy_data):
-        # local scratch dir
-        original_data_dir = base_data_dir
-        base_data_dir = os.path.join(get_local_scratch_dir(), "Marigold_data")
-        # copy data
-        required_data_list = find_value_in_omegaconf("dir", cfg_data)
-        # if cfg_train.visualize.init_latent_path is not None:
-        #     required_data_list.append(cfg_train.visualize.init_latent_path)
-        required_data_list = list(set(required_data_list))
-        logging.info(f"Required_data_list: {required_data_list}")
-        for d in tqdm(required_data_list, desc="Copy data to local scratch"):
-            ori_dir = os.path.join(original_data_dir, d)
-            dst_dir = os.path.join(base_data_dir, d)
-            os.makedirs(os.path.dirname(dst_dir), exist_ok=True)
-            if os.path.isfile(ori_dir):
-                shutil.copyfile(ori_dir, dst_dir)
-            elif os.path.isdir(ori_dir):
-                shutil.copytree(ori_dir, dst_dir)
-        logging.info(f"Data copied to: {base_data_dir}")
 
     # -------------------- Gradient accumulation steps --------------------
     eff_bs = cfg.dataloader.effective_batch_size
