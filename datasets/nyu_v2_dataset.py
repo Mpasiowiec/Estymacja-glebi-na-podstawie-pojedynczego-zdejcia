@@ -35,8 +35,8 @@ class NYUv2Dataset(BaseDepthDataset):
             # NYUv2 dataset parameter
             min_depth=1e-3,
             max_depth=10.0,
-            has_filled_depth=True,
-            name_mode=DepthFileNameMode.rgb_id,
+            has_filled_depth=False,
+            name_mode=DepthFileNameMode.id,
             **kwargs,
         )
 

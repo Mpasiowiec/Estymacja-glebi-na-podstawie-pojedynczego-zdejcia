@@ -32,7 +32,7 @@ from omegaconf import OmegaConf
 from torch.utils.data import ConcatDataset, DataLoader
 from tqdm import tqdm
 
-from models.Marigold import MarigoldPipeline
+from models.Marigold import MarigoldPipeline, get_Marigold
 from datasets import BaseDepthDataset, DatasetMode, get_dataset
 from datasets.mixed_sampler import MixedBatchSampler
 from trainers import get_trainer_cls
@@ -93,13 +93,14 @@ if "__main__" == __name__:
     parser.add_argument(
         "--base_data_dir",
         type=str,
-        default="/content/drive/MyDrive/magisterka/dane/vkitti2",
+        default='/content/drive/MyDrive/magisterka/dane',
         help="directory of training data"
     )
     parser.add_argument(
         "--base_ckpt_dir",
         type=str,
-        default="/content/drive/MyDrive/magisterka/ckp",
+        # default="/content/drive/MyDrive/magisterka/Estymacja-glebi-na-podstawie-pojedynczego-zdejcia/ckpt",
+        default="stabilityai",
         help="directory of pretrained checkpoint",
     )
     parser.add_argument(

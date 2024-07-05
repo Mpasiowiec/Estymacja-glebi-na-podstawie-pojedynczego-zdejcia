@@ -14,25 +14,26 @@ dataset:
     kitti_bm_crop: true
     valid_mask_crop: null
   val:
-    name: vkitti2
-    disp_name: vkitti2_val
-    dir: vkitti2
-    filenames: data_split/vkitti2_val.txt
-    kitti_bm_crop: true
-    valid_mask_crop: eigen
+    - name: vkitti2
+      disp_name: vkitti2_val
+      dir: vkitti2
+      filenames: data_split/vkitti2_valid.txt
+      kitti_bm_crop: true
+      valid_mask_crop: eigen
   vis:
-    name: vkitti2
-    disp_name: vkitti2_test
-    dir: vkitti2
-    filenames: data_split/vkitti2_test.txt
-    kitti_bm_crop: true
-    valid_mask_crop: eigen
+    - name: vkitti2
+      disp_name: vkitti2_test
+      dir: vkitti2
+      filenames: data_split/vkitti2_test.txt
+      kitti_bm_crop: true
+      valid_mask_crop: eigen
 
 pipeline:
   name: MarigoldPipeline
   kwargs:
     scale_invariant: true
     shift_invariant: true
+    default_processing_resolution: 256
 
 depth_normalization:
   type: scale_shift_depth
