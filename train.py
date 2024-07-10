@@ -311,6 +311,7 @@ if "__main__" == __name__:
     model = MarigoldPipeline.from_pretrained(
         os.path.join(base_ckpt_dir, cfg.model.pretrained_path), **_pipeline_kwargs
     )
+    print(model.default_processing_resolution)
 
     # -------------------- Trainer --------------------
     # Exit time
