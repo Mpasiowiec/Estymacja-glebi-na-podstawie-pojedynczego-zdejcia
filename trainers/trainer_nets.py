@@ -155,8 +155,8 @@ class NetTrainer:
                 # Masked loss
                 if self.gt_mask_type is not None:
                     batch_loss = self.loss(
-                        model_pred[valid_mask_down].float(),
-                        depth_gt[valid_mask_down].float(),
+                        model_pred[valid_mask].float(),
+                        depth_gt[valid_mask].float(),
                     )
                 else:
                     batch_loss = self.loss(model_pred.float(), depth_gt.float())
