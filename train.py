@@ -34,6 +34,7 @@ from util.logging_util import (
 )
 
 if "__main__" == __name__:
+
     t_start = datetime.now()
     print(f"start at {t_start}")
 
@@ -86,13 +87,6 @@ if "__main__" == __name__:
         help="directory of training data"
     )
     parser.add_argument(
-        "--base_ckpt_dir",
-        type=str,
-        # default="/content/drive/MyDrive/magisterka/Estymacja-glebi-na-podstawie-pojedynczego-zdejcia/ckpt",
-        default="stabilityai",
-        help="directory of pretrained checkpoint",
-    )
-    parser.add_argument(
         "--add_datetime_prefix",
         action="store_false",
         help="Add datetime to the output folder name",
@@ -105,11 +99,6 @@ if "__main__" == __name__:
         args.base_data_dir
         if args.base_data_dir is not None
         else os.environ["BASE_DATA_DIR"]
-    )
-    base_ckpt_dir = (
-        args.base_ckpt_dir
-        if args.base_ckpt_dir is not None
-        else os.environ["BASE_CKPT_DIR"]
     )
 
     # -------------------- Initialization --------------------
@@ -294,7 +283,6 @@ if "__main__" == __name__:
         model=model,
         train_dataloader=train_loader,
         device=device,
-        base_ckpt_dir=base_ckpt_dir,
         out_dir_ckpt=out_dir_ckpt,
         out_dir_eval=out_dir_eval,
         accumulation_steps=accumulation_steps,

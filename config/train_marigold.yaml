@@ -14,19 +14,16 @@ dataset:
     kitti_bm_crop: true
     valid_mask_crop: null
   val:
-    - name: vkitti2
-      disp_name: vkitti2_val
-      dir: vkitti2
-      filenames: data_split/vkitti2_valid.txt
-      kitti_bm_crop: true
-      valid_mask_crop: eigen
+    name: hypersim
+    disp_name: hypersim_test
+    dir: hypersim/data
+    filenames: data_split/hypersim_test.txt 
   vis:
-    - name: vkitti2
-      disp_name: vkitti2_test
-      dir: vkitti2
-      filenames: data_split/vkitti2_test.txt
-      kitti_bm_crop: true
-      valid_mask_crop: eigen
+    name: nyu_v2
+    disp_name: nyu_v2
+    dir: nyu_v2
+    filenames: data_split/nyu_2_paths.txt
+    eigen_valid_mask: true
 
 pipeline:
   name: MarigoldPipeline

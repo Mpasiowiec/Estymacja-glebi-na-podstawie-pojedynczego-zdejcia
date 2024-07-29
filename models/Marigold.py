@@ -133,7 +133,7 @@ class MarigoldPipeline(DiffusionPipeline):
         scale_invariant: Optional[bool] = True,
         shift_invariant: Optional[bool] = True,
         default_denoising_steps: Optional[int] = None,
-        default_processing_resolution: Optional[int] = None,
+        default_processing_resolution: Optional[int] = 256,
         empty_text_embed = None
     ):
         super().__init__()

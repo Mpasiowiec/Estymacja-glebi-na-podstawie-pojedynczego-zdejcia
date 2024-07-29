@@ -18,7 +18,7 @@ from tqdm import tqdm
 from PIL import Image
 
 from models.MiDas import MidasNet
-from models.TernausNest import UNet16
+from models.TernausNet import UNet16
 
 from util import metric
 from util.data_loader import skip_first_batches
@@ -36,7 +36,6 @@ class NetTrainer:
         model,
         train_dataloader: DataLoader,
         device,
-        base_ckpt_dir,
         out_dir_ckpt,
         out_dir_eval,
         accumulation_steps: int,
@@ -56,7 +55,7 @@ class NetTrainer:
 
         # Optimizer !should be defined after input layer is adapted
         lr = self.cfg.lr
-        self.optimizer = Adam(self.model.unet.parameters(), lr=lr)
+        self.optimizer = Adam(self.model.parameters(), lr=lr)
 
         # LR scheduler
         lr_func = IterExponential(
@@ -138,11 +137,11 @@ class NetTrainer:
 
                 if self.gt_mask_type is not None:
                     valid_mask = batch[self.gt_mask_type].to(device)
-                    invalid_mask = ~valid_mask
-                    valid_mask_down = ~torch.max_pool2d(
-                        invalid_mask.float(), 8, 8
-                    ).bool()
-                    valid_mask_down = valid_mask_down.repeat((1, 4, 1, 1))
+                    # invalid_mask = ~valid_mask
+                    # valid_mask_down = ~torch.max_pool2d(
+                    #     invalid_mask.float(), 8, 8
+                    # ).bool()
+                    # valid_mask_down = valid_mask_down.repeat((1, 4, 1, 1))
                 else:
                     raise NotImplementedError
 
