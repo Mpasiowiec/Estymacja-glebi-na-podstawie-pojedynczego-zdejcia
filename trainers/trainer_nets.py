@@ -1,23 +1,4 @@
-# Copyright 2023 Bingxin Ke, ETH Zurich. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# --------------------------------------------------------------------------
-# If you find this code useful, we kindly ask you to cite our paper in your work.
-# Please find bibtex at: https://github.com/prs-eth/Marigold#-citation
-# If you use or adapt this code, please attribute to https://github.com/prs-eth/marigold.
-# More information about the method can be found at https://marigoldmonodepth.github.io
-# --------------------------------------------------------------------------
-
+# Adopted: https://github.com/prs-eth/Marigold/blob/main/src/trainer/marigold_trainer.py
 
 import logging
 import os
@@ -27,7 +8,6 @@ from typing import List, Union
 
 import numpy as np
 import torch
-from diffusers import DDPMScheduler
 from omegaconf import OmegaConf
 from torch.nn import Conv2d
 from torch.nn.parameter import Parameter
@@ -37,8 +17,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from PIL import Image
 
-from models.MiDas import *
-from models.TernausNest import *
+from models.MiDas import MidasNet
+from models.TernausNest import UNet16
 
 from util import metric
 from util.data_loader import skip_first_batches
@@ -46,7 +26,6 @@ from util.logging_util import tb_logger, eval_dic_to_text
 from util.loss import get_loss
 from util.lr_scheduler import IterExponential
 from util.metric import MetricTracker
-from util.multi_res_noise import multi_res_noise_like
 from util.alignment import align_depth_least_square
 from util.seeding import generate_seed_sequence
 
@@ -60,42 +39,20 @@ class NetTrainer:
         base_ckpt_dir,
         out_dir_ckpt,
         out_dir_eval,
-        out_dir_vis,
         accumulation_steps: int,
         val_dataloaders: List[DataLoader] = None,
-        vis_dataloaders: List[DataLoader] = None,
     ):
         self.cfg: OmegaConf = cfg
-        self.model: MarigoldPipeline = model
+        self.model: Union[UNet16, MidasNet] = model
         self.device = device
         self.seed: Union[int, None] = (
             self.cfg.trainer.init_seed
         )  # used to generate seed sequence, set to `None` to train w/o seeding
         self.out_dir_ckpt = out_dir_ckpt
         self.out_dir_eval = out_dir_eval
-        self.out_dir_vis = out_dir_vis
         self.train_loader: DataLoader = train_dataloader
         self.val_loaders: List[DataLoader] = val_dataloaders
-        self.vis_loaders: List[DataLoader] = vis_dataloaders
         self.accumulation_steps: int = accumulation_steps
-
-        # Adapt input layers
-        if 8 != self.model.unet.config["in_channels"]:
-            self._replace_unet_conv_in()
-
-        # Encode empty text prompt
-        self.model.encode_empty_text()
-        self.empty_text_embed = self.model.empty_text_embed.detach().clone().to(device)
-        
-        try:
-          self.model.unet.enable_xformers_memory_efficient_attention()
-        except ValueError:
-          pass
-
-        # Trainability
-        self.model.vae.requires_grad_(False)
-        self.model.text_encoder.requires_grad_(False)
-        self.model.unet.requires_grad_(True)
 
         # Optimizer !should be defined after input layer is adapted
         lr = self.cfg.lr
@@ -111,22 +68,6 @@ class NetTrainer:
 
         # Loss
         self.loss = get_loss(loss_name=self.cfg.loss.name, **self.cfg.loss.kwargs)
-
-        # Training noise scheduler
-        self.training_noise_scheduler: DDPMScheduler = DDPMScheduler.from_pretrained(
-            os.path.join(
-                base_ckpt_dir,
-                cfg.trainer.training_noise_scheduler.pretrained_path,
-                "scheduler",
-            )
-        )
-        self.prediction_type = self.training_noise_scheduler.config.prediction_type
-        assert (
-            self.prediction_type == self.model.scheduler.config.prediction_type
-        ), "Different prediction types"
-        self.scheduler_timesteps = (
-            self.training_noise_scheduler.config.num_train_timesteps
-        )
 
         # Eval metrics
         self.metric_funcs = [getattr(metric, _met) for _met in cfg.eval.eval_metrics]
@@ -149,16 +90,7 @@ class NetTrainer:
         self.save_period = self.cfg.trainer.save_period
         self.backup_period = self.cfg.trainer.backup_period
         self.val_period = self.cfg.trainer.validation_period
-        self.vis_period = self.cfg.trainer.visualization_period
 
-        # Multi-resolution noise
-        self.apply_multi_res_noise = self.cfg.multi_res_noise is not None
-        if self.apply_multi_res_noise:
-            self.mr_noise_strength = self.cfg.multi_res_noise.strength
-            self.annealed_mr_noise = self.cfg.multi_res_noise.annealed
-            self.mr_noise_downscale_strategy = (
-                self.cfg.multi_res_noise.downscale_strategy
-            )
 
         # Internal variables
         self.epoch = 1
@@ -166,27 +98,6 @@ class NetTrainer:
         self.effective_iter = 0  # how many times optimizer.step() is called
         self.in_evaluation = False
         self.global_seed_sequence: List = []  # consistent global seed sequence, used to seed random generator, to ensure consistency when resuming
-
-    def _replace_unet_conv_in(self):
-        # replace the first layer to accept 8 in_channels
-        _weight = self.model.unet.conv_in.weight.clone()  # [320, 4, 3, 3]
-        _bias = self.model.unet.conv_in.bias.clone()  # [320]
-        _weight = _weight.repeat((1, 2, 1, 1))  # Keep selected channel(s)
-        # half the activation magnitude
-        _weight *= 0.5
-        # new conv_in channel
-        _n_convin_out_channel = self.model.unet.conv_in.out_channels
-        _new_conv_in = Conv2d(
-            8, _n_convin_out_channel, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)
-        )
-        _new_conv_in.weight = Parameter(_weight)
-        _new_conv_in.bias = Parameter(_bias)
-        self.model.unet.conv_in = _new_conv_in
-        logging.info("Unet conv_in layer is replaced")
-        # replace config
-        self.model.unet.config["in_channels"] = 8
-        logging.info("Unet config is updated")
-        return
 
     def train(self, t_end=None):
         logging.info("Start training")
@@ -209,7 +120,7 @@ class NetTrainer:
 
             # Skip previous batches when resume
             for batch in skip_first_batches(self.train_loader, self.n_batch_in_epoch):
-                self.model.unet.train()
+                self.model.train()
 
                 # globally consistent random generators
                 if self.seed is not None:
@@ -223,11 +134,11 @@ class NetTrainer:
 
                 # Get data
                 rgb = batch["rgb_norm"].to(device)
-                depth_gt_for_latent = batch[self.gt_depth_type].to(device)
+                depth_gt = batch[self.gt_depth_type].to(device)
 
                 if self.gt_mask_type is not None:
-                    valid_mask_for_latent = batch[self.gt_mask_type].to(device)
-                    invalid_mask = ~valid_mask_for_latent
+                    valid_mask = batch[self.gt_mask_type].to(device)
+                    invalid_mask = ~valid_mask
                     valid_mask_down = ~torch.max_pool2d(
                         invalid_mask.float(), 8, 8
                     ).bool()
@@ -237,88 +148,21 @@ class NetTrainer:
 
                 batch_size = rgb.shape[0]
 
-                with torch.no_grad():
-                    # Encode image
-                    rgb_latent = self.model.encode_rgb(rgb)  # [B, 4, h, w]
-                    # Encode GT depth
-                    gt_depth_latent = self.encode_depth(
-                        depth_gt_for_latent
-                    )  # [B, 4, h, w]
-
-                # Sample a random timestep for each image
-                timesteps = torch.randint(
-                    0,
-                    self.scheduler_timesteps,
-                    (batch_size,),
-                    device=device,
-                    generator=rand_num_generator,
-                ).long()  # [B]
-
-                # Sample noise
-                if self.apply_multi_res_noise:
-                    strength = self.mr_noise_strength
-                    if self.annealed_mr_noise:
-                        # calculate strength depending on t
-                        strength = strength * (timesteps / self.scheduler_timesteps)
-                    noise = multi_res_noise_like(
-                        gt_depth_latent,
-                        strength=strength,
-                        downscale_strategy=self.mr_noise_downscale_strategy,
-                        generator=rand_num_generator,
-                        device=device,
-                    )
-                else:
-                    noise = torch.randn(
-                        gt_depth_latent.shape,
-                        device=device,
-                        generator=rand_num_generator,
-                    )  # [B, 4, h, w]
-
-                # Add noise to the latents (diffusion forward process)
-                noisy_latents = self.training_noise_scheduler.add_noise(
-                    gt_depth_latent, noise, timesteps
-                )  # [B, 4, h, w]
-
-                # Text embedding
-                text_embed = self.empty_text_embed.to(device).repeat(
-                    (batch_size, 1, 1)
-                )  # [B, 77, 1024]
-
-                # Concat rgb and depth latents
-                cat_latents = torch.cat(
-                    [rgb_latent, noisy_latents], dim=1
-                )  # [B, 8, h, w]
-                cat_latents = cat_latents.float()
-
-                # Predict the noise residual
-                model_pred = self.model.unet(
-                    cat_latents, timesteps, text_embed
-                ).sample  # [B, 4, h, w]
+                # Prediction
+                model_pred = self.model(rgb)
                 if torch.isnan(model_pred).any():
                     logging.warning("model_pred contains NaN.")
 
-                # Get the target for loss depending on the prediction type
-                if "sample" == self.prediction_type:
-                    target = gt_depth_latent
-                elif "epsilon" == self.prediction_type:
-                    target = noise
-                elif "v_prediction" == self.prediction_type:
-                    target = self.training_noise_scheduler.get_velocity(
-                        gt_depth_latent, noise, timesteps
-                    )  # [B, 4, h, w]
-                else:
-                    raise ValueError(f"Unknown prediction type {self.prediction_type}")
-
-                # Masked latent loss
+                # Masked loss
                 if self.gt_mask_type is not None:
-                    latent_loss = self.loss(
+                    batch_loss = self.loss(
                         model_pred[valid_mask_down].float(),
-                        target[valid_mask_down].float(),
+                        depth_gt[valid_mask_down].float(),
                     )
                 else:
-                    latent_loss = self.loss(model_pred.float(), target.float())
+                    batch_loss = self.loss(model_pred.float(), depth_gt.float())
 
-                loss = latent_loss.mean()
+                loss = batch_loss.mean()
 
                 self.train_metrics.update("loss", loss.item())
 
@@ -385,13 +229,6 @@ class NetTrainer:
             # Epoch end
             self.n_batch_in_epoch = 0
 
-    def encode_depth(self, depth_in):
-        # stack depth into 3-channel
-        stacked = self.stack_depth_images(depth_in)
-        # encode using VAE encoder
-        depth_latent = self.model.encode_rgb(stacked)
-        return depth_latent
-
     @staticmethod
     def stack_depth_images(depth_in):
         if 4 == len(depth_in.shape):
@@ -426,10 +263,6 @@ class NetTrainer:
             and not _is_latest_saved
         ):
             self.save_checkpoint(ckpt_name="latest", save_train_state=True)
-
-        # Visualization
-        if self.vis_period > 0 and 0 == self.effective_iter % self.vis_period:
-            self.visualize()
 
     def validate(self):
         for i, val_loader in enumerate(self.val_loaders):
@@ -475,19 +308,6 @@ class NetTrainer:
                         ckpt_name=self._get_backup_ckpt_name(), save_train_state=False
                     )
 
-    def visualize(self):
-        for val_loader in self.vis_loaders:
-            vis_dataset_name = val_loader.dataset.disp_name
-            vis_out_dir = os.path.join(
-                self.out_dir_vis, self._get_backup_ckpt_name(), vis_dataset_name
-            )
-            os.makedirs(vis_out_dir, exist_ok=True)
-            _ = self.validate_single_dataset(
-                data_loader=val_loader,
-                metric_tracker=self.val_metrics,
-                save_to_dir=vis_out_dir,
-            )
-
     @torch.no_grad()
     def validate_single_dataset(
         self,
@@ -526,31 +346,9 @@ class NetTrainer:
                 generator.manual_seed(seed)
 
             # Predict depth
-            pipe_out: MarigoldDepthOutput = self.model(
-                rgb_int,
-                denoising_steps=self.cfg.validation.denoising_steps,
-                ensemble_size=self.cfg.validation.ensemble_size,
-                processing_res=self.cfg.validation.processing_res,
-                match_input_res=self.cfg.validation.match_input_res,
-                generator=generator,
-                batch_size=1,  # use batch size 1 to increase reproducibility
-                color_map=None,
-                show_progress_bar=False,
-                resample_method=self.cfg.validation.resample_method,
-            )
+            model_pred = self.model(rgb_int)
 
-            depth_pred: np.ndarray = pipe_out.depth_np
-
-            if "least_square" == self.cfg.eval.alignment:
-                depth_pred, scale, shift = align_depth_least_square(
-                    gt_arr=depth_raw,
-                    pred_arr=depth_pred,
-                    valid_mask_arr=valid_mask,
-                    return_scale_shift=True,
-                    max_resolution=self.cfg.eval.align_max_res,
-                )
-            else:
-                raise RuntimeError(f"Unknown alignment type: {self.cfg.eval.alignment}")
+            depth_pred: np.ndarray = model_pred.cpu().numpy()
 
             # Clip to dataset min max
             depth_pred = np.clip(
@@ -576,7 +374,7 @@ class NetTrainer:
             if save_to_dir is not None:
                 img_name = batch["rgb_relative_path"][0].replace("/", "_")
                 png_save_path = os.path.join(save_to_dir, f"{img_name}.png")
-                depth_to_save = (pipe_out.depth_np * 65535.0).astype(np.uint16)
+                depth_to_save = (model_pred.cpu().numpy() * 65535.0).astype(np.uint16)
                 Image.fromarray(depth_to_save).save(png_save_path, mode="I;16")
 
         return metric_tracker.result()
@@ -607,9 +405,9 @@ class NetTrainer:
             logging.debug(f"Old checkpoint is backed up at: {temp_ckpt_dir}")
 
         # Save UNet
-        unet_path = os.path.join(ckpt_dir, "unet")
-        self.model.unet.save_pretrained(unet_path, safe_serialization=False)
-        logging.info(f"UNet is saved to: {unet_path}")
+        net_path = os.path.join(ckpt_dir, "net")
+        self.model.save_pretrained(net_path, safe_serialization=False)
+        logging.info(f"Net is saved to: {net_path}")
 
         if save_train_state:
             state = {
@@ -640,13 +438,13 @@ class NetTrainer:
         self, ckpt_path, load_trainer_state=True, resume_lr_scheduler=True
     ):
         logging.info(f"Loading checkpoint from: {ckpt_path}")
-        # Load UNet
-        _model_path = os.path.join(ckpt_path, "unet", "diffusion_pytorch_model.bin")
-        self.model.unet.load_state_dict(
+        # Load Net
+        _model_path = os.path.join(ckpt_path, "net", "diffusion_pytorch_model.bin")
+        self.model.load_state_dict(
             torch.load(_model_path, map_location=self.device)
         )
-        self.model.unet.to(self.device)
-        logging.info(f"UNet parameters are loaded from {_model_path}")
+        self.model.to(self.device)
+        logging.info(f"Net parameters are loaded from {_model_path}")
 
         # Load training states
         if load_trainer_state:

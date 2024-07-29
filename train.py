@@ -1,25 +1,3 @@
-# An official reimplemented version of Marigold training script
-# Last modified: 2024-05-17
-#
-# Copyright 2023 Bingxin Ke, ETH Zurich. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# --------------------------------------------------------------------------
-# If you find this code useful, we kindly ask you to cite our paper in your work.
-# Please find bibtex at: https://github.com/prs-eth/Marigold#-citation
-# More information about the method can be found at https://marigoldmonodepth.github.io
-# --------------------------------------------------------------------------
-
 import argparse
 import logging
 import os
@@ -32,10 +10,12 @@ from omegaconf import OmegaConf
 from torch.utils.data import ConcatDataset, DataLoader
 from tqdm import tqdm
 
-from models.Marigold import MarigoldPipeline, get_Marigold
+from models.MiDas import MidasNet
+from models.TernausNet import UNet16 
+
 from datasets import BaseDepthDataset, DatasetMode, get_dataset
 from datasets.mixed_sampler import MixedBatchSampler
-from trainers import get_trainer_cls
+from trainers.trainer_nets import NetTrainer
 from util.config_util import (
     find_value_in_omegaconf,
     recursive_load_config,
@@ -59,10 +39,11 @@ if "__main__" == __name__:
 
     # -------------------- Arguments --------------------
     parser = argparse.ArgumentParser(description="Train your cute model!")
+    
     parser.add_argument(
         "--config",
         type=str,
-        default="config/train_marigold.yaml",
+        default="config/train_nets.yaml",
         help="Path to config file.",
     )
     parser.add_argument(
@@ -77,14 +58,22 @@ if "__main__" == __name__:
         default="/content",
         help="directory to save checkpoints"
     )
-    parser.add_argument("--no_cuda", action="store_true", help="Do not use cuda.")
+    parser.add_argument(
+        "--no_cuda", 
+        action="store_true", 
+        help="Do not use cuda."
+    )
     parser.add_argument(
         "--exit_after",
         type=int,
         default=-1,
         help="Save checkpoint and exit after X minutes.",
     )
-    parser.add_argument("--no_wandb", action="store_true", help="run without wandb")
+    parser.add_argument(
+        "--no_wandb", 
+        action="store_true", 
+        help="run without wandb"
+    )
     parser.add_argument(
         "--do_not_copy_data",
         action="store_true",
@@ -161,9 +150,6 @@ if "__main__" == __name__:
     out_dir_eval = os.path.join(out_dir_run, "evaluation")
     if not os.path.exists(out_dir_eval):
         os.makedirs(out_dir_eval)
-    out_dir_vis = os.path.join(out_dir_run, "visualization")
-    if not os.path.exists(out_dir_vis):
-        os.makedirs(out_dir_vis)
 
     # -------------------- Logging settings --------------------
     config_logging(cfg.logging, out_dir=out_dir_run)
@@ -290,28 +276,9 @@ if "__main__" == __name__:
         )
         val_loaders.append(_val_loader)
 
-    # Visualization dataset
-    vis_loaders: List[DataLoader] = []
-    for _vis_dic in cfg_data.vis:
-        _vis_dataset = get_dataset(
-            _vis_dic,
-            base_data_dir=base_data_dir,
-            mode=DatasetMode.EVAL,
-        )
-        _vis_loader = DataLoader(
-            dataset=_vis_dataset,
-            batch_size=1,
-            shuffle=False,
-            num_workers=cfg.dataloader.num_workers,
-        )
-        vis_loaders.append(_vis_loader)
-
     # -------------------- Model --------------------
-    _pipeline_kwargs = cfg.pipeline.kwargs if cfg.pipeline.kwargs is not None else {}
-    model = MarigoldPipeline.from_pretrained(
-        os.path.join(base_ckpt_dir, cfg.model.pretrained_path), **_pipeline_kwargs
-    )
-    print(model.default_processing_resolution)
+    
+    model = UNet16(pretrained=True, is_deconv=True)     
 
     # -------------------- Trainer --------------------
     # Exit time
@@ -321,9 +288,8 @@ if "__main__" == __name__:
     else:
         t_end = None
 
-    trainer_cls = get_trainer_cls(cfg.trainer.name)
-    logging.debug(f"Trainer: {trainer_cls}")
-    trainer = trainer_cls(
+    logging.debug(f"Trainer: treiner_nets")
+    trainer = NetTrainer(
         cfg=cfg,
         model=model,
         train_dataloader=train_loader,
@@ -331,10 +297,8 @@ if "__main__" == __name__:
         base_ckpt_dir=base_ckpt_dir,
         out_dir_ckpt=out_dir_ckpt,
         out_dir_eval=out_dir_eval,
-        out_dir_vis=out_dir_vis,
         accumulation_steps=accumulation_steps,
         val_dataloaders=val_loaders,
-        vis_dataloaders=vis_loaders,
     )
 
     # -------------------- Checkpoint --------------------
