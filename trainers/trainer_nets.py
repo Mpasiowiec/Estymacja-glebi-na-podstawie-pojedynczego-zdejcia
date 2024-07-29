@@ -402,11 +402,13 @@ class NetTrainer:
                 shutil.rmtree(temp_ckpt_dir, ignore_errors=True)
             os.rename(ckpt_dir, temp_ckpt_dir)
             logging.debug(f"Old checkpoint is backed up at: {temp_ckpt_dir}")
+        
+        os.makedirs(ckpt_dir)
 
         # Save UNet
-        net_path = os.path.join(ckpt_dir, "net")
-        self.model.save_pretrained(net_path, safe_serialization=False)
-        logging.info(f"Net is saved to: {net_path}")
+        net_path = os.path.join(ckpt_dir, 'net.pth')
+        torch.save(self.model.state_dict(), net_path)
+        logging.info(f"Network weights are saved to: {net_path}")
 
         if save_train_state:
             state = {
@@ -438,7 +440,7 @@ class NetTrainer:
     ):
         logging.info(f"Loading checkpoint from: {ckpt_path}")
         # Load Net
-        _model_path = os.path.join(ckpt_path, "net", "diffusion_pytorch_model.bin")
+        _model_path = os.path.join(ckpt_path, "net.pth")
         self.model.load_state_dict(
             torch.load(_model_path, map_location=self.device)
         )
