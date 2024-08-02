@@ -2,5 +2,5 @@ name: vkitti2
 disp_name: vkitti2_test
 dir: vkitti2
 filenames: data_split/vkitti2_test.txt
-kitti_bm_crop: true
+kitti_bm_crop: True
 valid_mask_crop: eigen

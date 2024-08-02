@@ -41,5 +41,5 @@ class HypersimDataset(BaseDepthDataset):
     def _read_depth_file(self, rel_path):
         depth_in = self._read_image(rel_path)
         # Decode Hypersim depth
-        depth_decoded = depth_in / 1000.0
+        depth_decoded = depth_in / 1000.0 # depth in meters
         return depth_decoded

@@ -1,0 +1,16 @@
+name: mixed
+prob_ls: [0.9, 0.1]
+dataset_list:
+- name: hypersim
+  disp_name: hypersim_val
+  dir: hypersim/data
+  filenames: data_split/hypersim_val.txt
+  resize_to_hw:
+  - 480
+  - 640
+- name: vkitti2
+  disp_name: vkitti2_val
+  dir: vkitti2
+  filenames: data_split/vkitti2_val.txt
+  kitti_bm_crop: true
+  valid_mask_crop: null
