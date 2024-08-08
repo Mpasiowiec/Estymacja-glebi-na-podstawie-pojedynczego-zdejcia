@@ -4,3 +4,29 @@ dir: vkitti2
 filenames: data_split/vkitti2_test.txt
 kitti_bm_crop: True
 valid_mask_crop: eigen
+
+
+augmentation_args:
+  
+  random_horizontal_flip:
+    in_use: false
+    p: 0.5
+
+  jitter:
+    in_use: false
+    p: 0.5
+    args:
+      hue: 0.1
+      brightness: 0.1
+      contrast: 0.1
+
+  cutdepth:
+    in_use: true
+    p: 1.5
+    depth_type: linear
+    par: 0.5
+
+  red_green_channel_swap:
+    in_use: false
+    p: 0.25
+

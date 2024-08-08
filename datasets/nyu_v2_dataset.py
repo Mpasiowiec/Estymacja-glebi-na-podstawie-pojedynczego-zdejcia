@@ -21,6 +21,7 @@
 # --------------------------------------------------------------------------
 
 import torch
+import numpy as np
 
 from .base_depth_dataset import BaseDepthDataset, DepthFileNameMode
 
@@ -44,8 +45,9 @@ class NYUv2Dataset(BaseDepthDataset):
 
     def _read_depth_file(self, rel_path):
         depth_in = self._read_image(rel_path)
+        depth_in = np.asarray(depth_in)
         # Decode NYU depth
-        depth_decoded = depth_in / 1000.0
+        depth_decoded = depth_in / 1000.0 # depth in meters
         return depth_decoded
 
     def _get_valid_mask(self, depth: torch.Tensor):

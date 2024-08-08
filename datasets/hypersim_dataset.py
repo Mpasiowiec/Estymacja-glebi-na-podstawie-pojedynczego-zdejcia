@@ -23,6 +23,7 @@
 
 from .base_depth_dataset import BaseDepthDataset, DepthFileNameMode
 
+import numpy as np
 
 class HypersimDataset(BaseDepthDataset):
     def __init__(
@@ -40,6 +41,7 @@ class HypersimDataset(BaseDepthDataset):
 
     def _read_depth_file(self, rel_path):
         depth_in = self._read_image(rel_path)
+        depth_in = np.asarray(depth_in)
         # Decode Hypersim depth
         depth_decoded = depth_in / 1000.0 # depth in meters
         return depth_decoded

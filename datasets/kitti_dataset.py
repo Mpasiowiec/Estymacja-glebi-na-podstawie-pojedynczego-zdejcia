@@ -21,6 +21,8 @@
 # --------------------------------------------------------------------------
 
 import torch
+import numpy as np
+from PIL import Image
 
 from .base_depth_dataset import BaseDepthDataset, DepthFileNameMode
 
@@ -53,6 +55,7 @@ class KITTIDataset(BaseDepthDataset):
 
     def _read_depth_file(self, rel_path):
         depth_in = self._read_image(rel_path)
+        depth_in = np.asarray(depth_in)
         # Decode KITTI depth
         depth_decoded = depth_in / 256.0
         return depth_decoded
@@ -60,11 +63,11 @@ class KITTIDataset(BaseDepthDataset):
     def _load_rgb_data(self, rgb_rel_path):
         rgb_data = super()._load_rgb_data(rgb_rel_path)
         if self.kitti_bm_crop:
-            rgb_data = {k: self.kitti_benchmark_crop(v) for k, v in rgb_data.items()}
+            rgb_data = {k: Image.fromarray((np.asarray(KITTIDataset.kitti_benchmark_crop(torch.from_numpy(np.transpose(np.asarray(v), (2, 0, 1)).astype(int)).int()).permute(1,2,0))).astype(np.uint8)) for k, v in rgb_data.items()}
         return rgb_data
 
-    def _load_depth_data(self, depth_rel_path, filled_rel_path):
-        depth_data = super()._load_depth_data(depth_rel_path, filled_rel_path)
+    def _load_depth_data(self, depth_rel_path): #, filled_rel_path):
+        depth_data = super()._load_depth_data(depth_rel_path) #, filled_rel_path)
         if self.kitti_bm_crop:
             depth_data = {
                 k: self.kitti_benchmark_crop(v) for k, v in depth_data.items()

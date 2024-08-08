@@ -30,7 +30,17 @@ import numpy as np
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
-from torchvision.transforms import InterpolationMode, Resize
+from torchvision.transforms import(
+  InterpolationMode,
+  Compose,
+  RandomHorizontalFlip,
+  Resize,
+  RandomResizedCrop,
+  ColorJitter,
+  Normalize,
+  ToTensor,
+  functional
+)
 
 from util.depth_transform import DepthNormalizerBase
 
@@ -100,13 +110,16 @@ class BaseDepthDataset(Dataset):
         rasters, other = self._get_data_item(index)
         if DatasetMode.TRAIN == self.mode:
             rasters = self._training_preprocess(rasters)
+        else:
+            rasters = {k: ToTensor()(v) if k == "rgb_img" else v for k, v in rasters.items()}
         # merge
         outputs = rasters
         outputs.update(other)
         return outputs
 
     def _get_data_item(self, index):
-        rgb_rel_path, depth_rel_path, filled_rel_path = self._get_data_path(index=index)
+        # rgb_rel_path, depth_rel_path, filled_rel_path = self._get_data_path(index=index)
+        rgb_rel_path, depth_rel_path = self._get_data_path(index=index)
 
         rasters = {}
 
@@ -117,16 +130,16 @@ class BaseDepthDataset(Dataset):
         if DatasetMode.RGB_ONLY != self.mode:
             # load data
             depth_data = self._load_depth_data(
-                depth_rel_path=depth_rel_path, filled_rel_path=filled_rel_path
+                depth_rel_path=depth_rel_path #, filled_rel_path=filled_rel_path
             )
             rasters.update(depth_data)
             # valid mask
             rasters["valid_mask_raw"] = self._get_valid_mask(
                 rasters["depth_raw_linear"]
             ).clone()
-            rasters["valid_mask_filled"] = self._get_valid_mask(
-                rasters["depth_filled_linear"]
-            ).clone()
+            # rasters["valid_mask_filled"] = self._get_valid_mask(
+            #     rasters["depth_filled_linear"]
+            # ).clone()
 
         other = {"index": index, "rgb_relative_path": rgb_rel_path}
 
@@ -135,27 +148,28 @@ class BaseDepthDataset(Dataset):
     def _load_rgb_data(self, rgb_rel_path):
         # Read RGB data
         rgb = self._read_rgb_file(rgb_rel_path)
-        rgb_norm = rgb / 255.0 * 2.0 - 1.0  #  [0, 255] -> [-1, 1]
+        # rgb_norm = rgb / 255.0 * 2.0 - 1.0  #  [0, 255] -> [-1, 1]
 
         outputs = {
-            "rgb_int": torch.from_numpy(rgb).int(),
-            "rgb_norm": torch.from_numpy(rgb_norm).float(),
+            "rgb_img": rgb,
+            # "rgb_int": torch.from_numpy(rgb).int(),
+            # "rgb_norm": torch.from_numpy(rgb_norm).float(),
         }
         return outputs
 
-    def _load_depth_data(self, depth_rel_path, filled_rel_path):
+    def _load_depth_data(self, depth_rel_path): # , filled_rel_path):
         # Read depth data
         outputs = {}
         depth_raw = self._read_depth_file(depth_rel_path).squeeze()
         depth_raw_linear = torch.from_numpy(depth_raw).float().unsqueeze(0)  # [1, H, W]
         outputs["depth_raw_linear"] = depth_raw_linear.clone()
 
-        if self.has_filled_depth:
-            depth_filled = self._read_depth_file(filled_rel_path).squeeze()
-            depth_filled_linear = torch.from_numpy(depth_filled).float().unsqueeze(0)
-            outputs["depth_filled_linear"] = depth_filled_linear
-        else:
-            outputs["depth_filled_linear"] = depth_raw_linear.clone()
+        # if self.has_filled_depth:
+        #     depth_filled = self._read_depth_file(filled_rel_path).squeeze()
+        #     depth_filled_linear = torch.from_numpy(depth_filled).float().unsqueeze(0)
+        #     outputs["depth_filled_linear"] = depth_filled_linear
+        # else:
+        #     outputs["depth_filled_linear"] = depth_raw_linear.clone()
 
         return outputs
 
@@ -168,23 +182,24 @@ class BaseDepthDataset(Dataset):
         depth_rel_path, filled_rel_path = None, None
         if DatasetMode.RGB_ONLY != self.mode:
             depth_rel_path = filename_line[1]
-            if self.has_filled_depth:
-                filled_rel_path = filename_line[2]
-        return rgb_rel_path, depth_rel_path, filled_rel_path
+            # if self.has_filled_depth:
+            #     filled_rel_path = filename_line[2]
+        return rgb_rel_path, depth_rel_path #, filled_rel_path
 
     def _read_image(self, img_rel_path) -> np.ndarray:
         image_to_read = os.path.join(self.dataset_dir, img_rel_path)
         image = Image.open(image_to_read)  # [H, W, rgb]
-        image = np.asarray(image)
+        # image = np.asarray(image)
         return image
 
     def _read_rgb_file(self, rel_path) -> np.ndarray:
         rgb = self._read_image(rel_path)
-        rgb = np.transpose(rgb, (2, 0, 1)).astype(int)  # [rgb, H, W]
+        # rgb = np.transpose(rgb, (2, 0, 1)).astype(int)  # [rgb, H, W]
         return rgb
 
     def _read_depth_file(self, rel_path):
         depth_in = self._read_image(rel_path)
+        depth_in = np.asarray(depth_in)
         #  Replace code below to decode depth according to dataset definition
         depth_decoded = depth_in
 
@@ -205,20 +220,6 @@ class BaseDepthDataset(Dataset):
         rasters["depth_raw_norm"] = self.depth_transform(
             rasters["depth_raw_linear"], rasters["valid_mask_raw"]
         ).clone()
-        rasters["depth_filled_norm"] = self.depth_transform(
-            rasters["depth_filled_linear"], rasters["valid_mask_filled"]
-        ).clone()
-
-        # Set invalid pixel to far plane
-        if self.move_invalid_to_far_plane:
-            if self.depth_transform.far_plane_at_max:
-                rasters["depth_filled_norm"][~rasters["valid_mask_filled"]] = (
-                    self.depth_transform.norm_max
-                )
-            else:
-                rasters["depth_filled_norm"][~rasters["valid_mask_filled"]] = (
-                    self.depth_transform.norm_min
-                )
 
         # Resize
         if self.resize_to_hw is not None:
@@ -230,10 +231,54 @@ class BaseDepthDataset(Dataset):
         return rasters
 
     def _augment_data(self, rasters_dict):
-        # lr flipping
-        lr_flip_p = self.augm_args.lr_flip_p
-        if random.random() < lr_flip_p:
-            rasters_dict = {k: v.flip(-1) for k, v in rasters_dict.items()}
+        # jitter:
+        if self.augm_args.jitter.in_use :
+            JIT_transform = ColorJitter(**self.augm_args.jitter.args)
+            if random.random() < self.augm_args.jitter.p:
+                rasters_dict = {k: JIT_transform(v) if 'rgb_img'==k else v for k, v in rasters_dict.items()}
+        # random_horizontal_flip:
+        if self.augm_args.random_horizontal_flip.in_use :
+            if random.random() < self.augm_args.random_horizontal_flip.p:
+                rasters_dict = {k: RandomHorizontalFlip(p=1)(v) for k, v in rasters_dict.items()}        
+        # this augmentaion for relative depth and needs rescale norm depth
+        # random_resize_crop:
+        # if self.augm_args.random_resize_crop.in_use :
+        #     crop = RandomResizedCrop(size=[list(rasters_dict[list(rasters_dict.keys())[0]].size)[-1], list(rasters_dict[list(rasters_dict.keys())[0]].size)[-2]])
+        #     params = crop.get_params(rasters_dict[list(rasters_dict.keys())[0]],  scale=(0.08, 1.0), ratio=(0.75, 1.33))
+        #     if random.random() < self.augm_args.random_resize_crop.p:
+        #         rasters_dict = {k: functional.crop(v, *params) for k, v in rasters_dict.items()}
+        #  red_green_channel_swap:
+        if self.augm_args.red_green_channel_swap.in_use :
+            if random.random() < self.augm_args.red_green_channel_swap.p:
+                im = rasters_dict['rgb_img'].convert('RGB')
+                r, g, b = im.split()
+                result = Image.merge('RGB', (g, r, b))
+                rasters_dict['rgb_img'] = result
+        
+        trans = Compose([
+          ToTensor(),
+          # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+        rasters_dict = {k: trans(v) if k == "rgb_img" else v for k, v in rasters_dict.items()}
+
+        # cutdepth:
+        if self.augm_args.cutdepth.in_use :
+            if random.random() < self.augm_args.cutdepth.p:
+              if self.augm_args.cutdepth.depth_type == 'linear':
+                temp_depth = rasters_dict['depth_raw_linear']
+              elif self.augm_args.cutdepth.depth_type == 'norm':
+                temp_depth = rasters_dict['depth_raw_norm']
+              else:
+                raise NotImplementedError
+              temp_im = rasters_dict['rgb_img']
+              h = int(temp_im.size()[-2])
+              W = int(temp_im.size()[-1])
+              l = int(np.random.uniform() * W )
+              w = int(max((W - l) * np.random.uniform() * self.augm_args.cutdepth.par, 1))
+              M = torch.zeros(h,W)
+              M[:,l:l+w] = 1
+              augm = (temp_depth * M - temp_im * (M-1))
+              rasters_dict['rgb_img'] = augm
 
         return rasters_dict
 
