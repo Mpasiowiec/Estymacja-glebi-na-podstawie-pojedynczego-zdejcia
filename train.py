@@ -56,7 +56,7 @@ if "__main__" == __name__:
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="/content",
+        default="/content/drive/MyDrive/magisterka",
         help="directory to save checkpoints"
     )
     parser.add_argument(
@@ -218,10 +218,10 @@ if "__main__" == __name__:
         cfg_data.train,
         base_data_dir=base_data_dir,
         mode=DatasetMode.TRAIN,
-        augmentation_args=cfg.augmentation,
+        augmentation_args=cfg.augmentation_args,
         depth_transform=depth_transform,
     )
-    logging.debug("Augmentation: ", cfg.augmentation)
+    logging.debug("Augmentation: ", cfg.augmentation_args)
     if "mixed" == cfg_data.train.name:
         dataset_ls = train_dataset
         assert len(cfg_data.train.prob_ls) == len(

@@ -136,7 +136,7 @@ class NetTrainer:
                 # >>> With gradient accumulation >>>
 
                 # Get data
-                rgb = batch["rgb_norm"].to(device)
+                rgb = batch["rgb_img"].to(device)
                 depth_gt = batch[self.gt_depth_type].to(device)
 
                 if self.gt_mask_type is not None:
@@ -331,7 +331,7 @@ class NetTrainer:
         ):
             assert 1 == data_loader.batch_size
             # Read input image
-            rgb_int = batch["rgb_int"].squeeze()  # [3, H, W]
+            rgb_int = batch["rgb_img"].squeeze()  # [3, H, W]
             # GT depth
             depth_raw_ts = batch["depth_raw_linear"].squeeze()
             depth_raw = depth_raw_ts.numpy()
