@@ -4,3 +4,4 @@ dir: vkitti2
 filenames: data_split/vkitti2_val.txt
 kitti_bm_crop: true
 valid_mask_crop: eigen
+norm_name: vkitti2

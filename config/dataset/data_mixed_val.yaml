@@ -8,9 +8,11 @@ dataset_list:
   resize_to_hw:
   - 480
   - 640
+  norm_name: mixed
 - name: vkitti2
   disp_name: vkitti2_val
   dir: vkitti2
   filenames: data_split/vkitti2_val.txt
   kitti_bm_crop: true
   valid_mask_crop: null
+  norm_name: mixed

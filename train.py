@@ -91,7 +91,7 @@ if "__main__" == __name__:
         action="store_false",
         help="Add datetime to the output folder name",
     )
-
+    
     args = parser.parse_args()
     resume_run = args.resume_run
     output_dir = args.output_dir
@@ -266,8 +266,12 @@ if "__main__" == __name__:
         val_loaders.append(_val_loader)
 
     # -------------------- Model --------------------
-    
-    model = UNet16(pretrained=True, is_deconv=True)     
+    if cfg.model.name == 'TernausNet':
+        model = UNet16(pretrained=True, is_deconv=True)
+    elif cfg.model.name == 'MiDas':
+      model = MidasNet(backbone=cfg.model.backbone)
+    else:
+      raise NotImplementedError 
 
     # -------------------- Trainer --------------------
     # Exit time

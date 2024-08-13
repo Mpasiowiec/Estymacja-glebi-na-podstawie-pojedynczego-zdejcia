@@ -2,3 +2,4 @@ name: hypersim
 disp_name: hypersim_train
 dir: hypersim/data
 filenames: data_split/hypersim_train.txt
+norm_name: hypersim

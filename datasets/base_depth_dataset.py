@@ -62,6 +62,7 @@ class BaseDepthDataset(Dataset):
     def __init__(
         self,
         mode: DatasetMode,
+        norm_name: str,
         filename_ls_path: str,
         dataset_dir: str,
         disp_name: str,
@@ -79,6 +80,7 @@ class BaseDepthDataset(Dataset):
         super().__init__()
         self.mode = mode
         # dataset info
+        self.norm_name = norm_name
         self.filename_ls_path = filename_ls_path
         self.dataset_dir = dataset_dir
         assert os.path.exists(
@@ -89,6 +91,24 @@ class BaseDepthDataset(Dataset):
         self.name_mode: DepthFileNameMode = name_mode
         self.min_depth = min_depth
         self.max_depth = max_depth
+
+        if self.norm_name == 'vkitti2':
+            self.means, self.stds = [0.3849854,  0.38966277, 0.3119897], [0.3849854,  0.38966277, 0.3119897]
+        elif self.norm_name == 'hypersim':
+            self.means, self.stds = [0.43323305, 0.40123018, 0.3691462], [0.43323305, 0.40123018, 0.3691462]
+        elif self.norm_name == 'mixed':
+            self.means, self.stds = [0.42240857, 0.398635  , 0.356323], [0.42240857, 0.398635,   0.356323]
+        elif self.norm_name == 'nyu':
+            self.means, self.stds = [0.48012177, 0.41071795, 0.39187136], [0.28875302, 0.29516797, 0.30792887]
+        elif self.norm_name == 'kitti':
+            self.means, self.stds = [0.38416928, 0.4104948 , 0.38838536], [0.30759685, 0.31810902, 0.32846335]
+        else:
+            raise NotImplementedError
+        
+        self.trans = Compose([
+          ToTensor(),
+          Normalize(mean=self.means, std=self.stds)
+        ])
 
         # training arguments
         self.depth_transform: DepthNormalizerBase = depth_transform
@@ -111,7 +131,7 @@ class BaseDepthDataset(Dataset):
         if DatasetMode.TRAIN == self.mode:
             rasters = self._training_preprocess(rasters)
         else:
-            rasters = {k: ToTensor()(v) if k == "rgb_img" else v for k, v in rasters.items()}
+            rasters = {k: self.trans(v) if k == "rgb_img" else v for k, v in rasters.items()}
         # merge
         outputs = rasters
         outputs.update(other)
@@ -215,6 +235,9 @@ class BaseDepthDataset(Dataset):
         # Augmentation
         if self.augm_args is not None:
             rasters = self._augment_data(rasters)
+        else:
+            rasters = {k: self.trans(v) if k == "rgb_img" else v for k, v in rasters.items()}
+
 
         # Normalization
         rasters["depth_raw_norm"] = self.depth_transform(
@@ -255,11 +278,7 @@ class BaseDepthDataset(Dataset):
                 result = Image.merge('RGB', (g, r, b))
                 rasters_dict['rgb_img'] = result
         
-        trans = Compose([
-          ToTensor(),
-          # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
-        rasters_dict = {k: trans(v) if k == "rgb_img" else v for k, v in rasters_dict.items()}
+        rasters_dict = {k: self.trans(v) if k == "rgb_img" else v for k, v in rasters_dict.items()}
 
         # cutdepth:
         if self.augm_args.cutdepth.in_use :

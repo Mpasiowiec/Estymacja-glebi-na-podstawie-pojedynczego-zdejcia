@@ -4,3 +4,4 @@ dir: kitti
 filenames: data_split/kitti_paths.txt
 kitti_bm_crop: true
 valid_mask_crop: eigen
+norm_name: kitti

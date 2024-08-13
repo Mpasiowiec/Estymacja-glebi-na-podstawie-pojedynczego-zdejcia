@@ -11,7 +11,7 @@ import torch
 from omegaconf import OmegaConf
 from torch.nn import Conv2d
 from torch.nn.parameter import Parameter
-from torch.optim import Adam
+from torch.optim import Adam, AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -55,7 +55,11 @@ class NetTrainer:
 
         # Optimizer !should be defined after input layer is adapted
         lr = self.cfg.lr
-        self.optimizer = Adam(self.model.parameters(), lr=lr)
+        
+        if self.cfg.optimizer.name == 'Adam':
+            self.optimizer = Adam(self.model.parameters(), lr=lr)
+        elif self.cfg.optimizer.name == 'AdamW':
+            self.optimizer = AdamW(self.model.parameters(), lr=lr)
 
         # LR scheduler
         lr_func = IterExponential(
