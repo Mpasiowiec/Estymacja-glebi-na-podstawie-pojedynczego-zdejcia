@@ -11,7 +11,7 @@ import torch
 from omegaconf import OmegaConf
 from torch.nn import Conv2d
 from torch.nn.parameter import Parameter
-from torch.optim import Adam, AdamW
+from torch.optim import Adam, AdamW, SGD
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -38,8 +38,8 @@ class NetTrainer:
         device,
         out_dir_ckpt,
         out_dir_eval,
-        accumulation_steps: int,
         val_dataloaders: List[DataLoader] = None,
+        test_dataloaders: List[DataLoader] = None,
     ):
         self.cfg: OmegaConf = cfg
         self.model: Union[UNet16, MidasNet] = model
@@ -51,7 +51,6 @@ class NetTrainer:
         self.out_dir_eval = out_dir_eval
         self.train_loader: DataLoader = train_dataloader
         self.val_loaders: List[DataLoader] = val_dataloaders
-        self.accumulation_steps: int = accumulation_steps
 
         # Optimizer !should be defined after input layer is adapted
         lr = self.cfg.lr
@@ -60,6 +59,8 @@ class NetTrainer:
             self.optimizer = Adam(self.model.parameters(), lr=lr)
         elif self.cfg.optimizer.name == 'AdamW':
             self.optimizer = AdamW(self.model.parameters(), lr=lr)
+        elif self.cfg.optimizer.name == 'SGD':
+            self.optimizer = SGD(self.model.parameters(), lr=lr)
 
         # LR scheduler
         lr_func = IterExponential(
@@ -87,7 +88,6 @@ class NetTrainer:
         # Settings
         self.max_epoch = self.cfg.max_epoch
         self.max_iter = self.cfg.max_iter
-        self.gradient_accumulation_steps = accumulation_steps
         self.gt_depth_type = self.cfg.gt_depth_type
         self.gt_mask_type = self.cfg.gt_mask_type
         self.save_period = self.cfg.trainer.save_period
@@ -141,15 +141,12 @@ class NetTrainer:
 
                 if self.gt_mask_type is not None:
                     valid_mask = batch[self.gt_mask_type].to(device)
-                    # invalid_mask = ~valid_mask
-                    # valid_mask_down = ~torch.max_pool2d(
-                    #     invalid_mask.float(), 8, 8
-                    # ).bool()
-                    # valid_mask_down = valid_mask_down.repeat((1, 4, 1, 1))
                 else:
                     raise NotImplementedError
 
                 batch_size = rgb.shape[0]
+
+                self.optimizer.zero_grad()
 
                 # Prediction
                 model_pred = self.model(rgb)
@@ -157,89 +154,72 @@ class NetTrainer:
                     logging.warning("model_pred contains NaN.")
 
                 # Masked loss
-                if self.gt_mask_type is not None:
-                    batch_loss = self.loss(
-                        model_pred[valid_mask].float(),
-                        depth_gt[valid_mask].float(),
-                    )
-                else:
-                    batch_loss = self.loss(model_pred.float(), depth_gt.float())
+                batch_loss = self.loss(
+                      model_pred[valid_mask].float(),
+                      depth_gt[valid_mask].float(),
+                  )
 
                 loss = batch_loss.mean()
 
                 self.train_metrics.update("loss", loss.item())
-
-                loss = loss / self.gradient_accumulation_steps
                 loss.backward()
-                accumulated_step += 1
 
                 self.n_batch_in_epoch += 1
-                # Practical batch end
 
                 # Perform optimization step
-                if accumulated_step >= self.gradient_accumulation_steps:
-                    self.optimizer.step()
-                    self.lr_scheduler.step()
-                    self.optimizer.zero_grad()
-                    accumulated_step = 0
+                self.optimizer.step()
+                self.lr_scheduler.step()
 
-                    self.effective_iter += 1
+                self.effective_iter += 1
 
-                    # Log to tensorboard
-                    accumulated_loss = self.train_metrics.result()["loss"]
-                    tb_logger.log_dic(
-                        {
-                            f"train/{k}": v
-                            for k, v in self.train_metrics.result().items()
-                        },
-                        global_step=self.effective_iter,
+                # Log to tensorboard
+                accumulated_loss = self.train_metrics.result()["loss"]
+                tb_logger.log_dic(
+                    {
+                        f"train/{k}": v
+                        for k, v in self.train_metrics.result().items()
+                    },
+                    global_step=self.effective_iter,
+                )
+                tb_logger.writer.add_scalar(
+                    "lr",
+                    self.lr_scheduler.get_last_lr()[0],
+                    global_step=self.effective_iter,
+                )
+                tb_logger.writer.add_scalar(
+                    "n_batch_in_epoch",
+                    self.n_batch_in_epoch,
+                    global_step=self.effective_iter,
+                )
+                logging.info(
+                    f"iter {self.effective_iter:5d} (epoch {epoch:2d}): loss={accumulated_loss:.5f}"
+                )
+                self.train_metrics.reset()
+
+                # Per-step callback
+                self._train_step_callback()
+
+                # End of training
+                if self.max_iter > 0 and self.effective_iter >= self.max_iter:
+                    self.save_checkpoint(
+                        ckpt_name=self._get_backup_ckpt_name(),
+                        save_train_state=False,
                     )
-                    tb_logger.writer.add_scalar(
-                        "lr",
-                        self.lr_scheduler.get_last_lr()[0],
-                        global_step=self.effective_iter,
-                    )
-                    tb_logger.writer.add_scalar(
-                        "n_batch_in_epoch",
-                        self.n_batch_in_epoch,
-                        global_step=self.effective_iter,
-                    )
-                    logging.info(
-                        f"iter {self.effective_iter:5d} (epoch {epoch:2d}): loss={accumulated_loss:.5f}"
-                    )
-                    self.train_metrics.reset()
+                    logging.info("Training ended.")
+                    return
+                # Time's up
+                elif t_end is not None and datetime.now() >= t_end:
+                    self.save_checkpoint(ckpt_name="latest", save_train_state=True)
+                    logging.info("Time is up, training paused.")
+                    return
 
-                    # Per-step callback
-                    self._train_step_callback()
-
-                    # End of training
-                    if self.max_iter > 0 and self.effective_iter >= self.max_iter:
-                        self.save_checkpoint(
-                            ckpt_name=self._get_backup_ckpt_name(),
-                            save_train_state=False,
-                        )
-                        logging.info("Training ended.")
-                        return
-                    # Time's up
-                    elif t_end is not None and datetime.now() >= t_end:
-                        self.save_checkpoint(ckpt_name="latest", save_train_state=True)
-                        logging.info("Time is up, training paused.")
-                        return
-
-                    torch.cuda.empty_cache()
-                    # <<< Effective batch end <<<
+                torch.cuda.empty_cache()
+                # <<< Effective batch end <<<
 
             # Epoch end
             self.n_batch_in_epoch = 0
 
     @staticmethod
-    def stack_depth_images(depth_in):
-        if 4 == len(depth_in.shape):
-            stacked = depth_in.repeat(1, 3, 1, 1)
-        elif 3 == len(depth_in.shape):
-            stacked = depth_in.unsqueeze(1)
-            stacked = depth_in.repeat(1, 3, 1, 1)
-        return stacked
 
     def _train_step_callback(self):
         """Executed after every iteration"""

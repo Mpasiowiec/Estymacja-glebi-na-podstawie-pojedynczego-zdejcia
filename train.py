@@ -24,13 +24,8 @@ from util.depth_transform import (
     DepthNormalizerBase,
     get_depth_normalizer,
 )
-from util.logging_util import (
-    config_logging,
-    init_wandb,
-    load_wandb_job_id,
-    log_slurm_job_id,
-    save_wandb_job_id,
-    tb_logger,
+from util.logging_util import(
+  config_logging
 )
 
 if "__main__" == __name__:
@@ -69,16 +64,6 @@ if "__main__" == __name__:
         type=int,
         default=-1,
         help="Save checkpoint and exit after X minutes.",
-    )
-    parser.add_argument(
-        "--no_wandb", 
-        action="store_true", 
-        help="run without wandb"
-    )
-    parser.add_argument(
-        "--do_not_copy_data",
-        action="store_true",
-        help="On Slurm cluster, do not copy data to local scratch",
     )
     parser.add_argument(
         "--base_data_dir",
@@ -133,9 +118,6 @@ if "__main__" == __name__:
     out_dir_ckpt = os.path.join(out_dir_run, "checkpoint")
     if not os.path.exists(out_dir_ckpt):
         os.makedirs(out_dir_ckpt)
-    out_dir_tb = os.path.join(out_dir_run, "tensorboard")
-    if not os.path.exists(out_dir_tb):
-        os.makedirs(out_dir_tb)
     out_dir_eval = os.path.join(out_dir_run, "evaluation")
     if not os.path.exists(out_dir_eval):
         os.makedirs(out_dir_eval)
@@ -143,33 +125,6 @@ if "__main__" == __name__:
     # -------------------- Logging settings --------------------
     config_logging(cfg.logging, out_dir=out_dir_run)
     logging.debug(f"config: {cfg}")
-
-    # Initialize wandb
-    if not args.no_wandb:
-        if resume_run is not None:
-            wandb_id = load_wandb_job_id(out_dir_run)
-            wandb_cfg_dic = {
-                "id": wandb_id,
-                "resume": "must",
-                **cfg.wandb,
-            }
-        else:
-            wandb_cfg_dic = {
-                "config": dict(cfg),
-                "name": job_name,
-                "mode": "online",
-                **cfg.wandb,
-            }
-        wandb_cfg_dic.update({"dir": out_dir_run})
-        wandb_run = init_wandb(enable=True, **wandb_cfg_dic)
-        save_wandb_job_id(wandb_run, out_dir_run)
-    else:
-        init_wandb(enable=False)
-
-    # Tensorboard (should be initialized after wandb)
-    tb_logger.set_dir(out_dir_tb)
-
-    log_slurm_job_id(step=0)
 
     # -------------------- Device --------------------
     cuda_avail = torch.cuda.is_available() and not args.no_cuda
@@ -191,17 +146,6 @@ if "__main__" == __name__:
         os.system(f"tar -cf {_code_snapshot_path} {_temp_code_dir}")
         os.system(f"rm -rf {_temp_code_dir}")
         logging.info(f"Code snapshot saved to: {_code_snapshot_path}")
-
-
-    # -------------------- Gradient accumulation steps --------------------
-    eff_bs = cfg.dataloader.effective_batch_size
-    accumulation_steps = eff_bs / cfg.dataloader.max_train_batch_size
-    assert int(accumulation_steps) == accumulation_steps
-    accumulation_steps = int(accumulation_steps)
-
-    logging.info(
-        f"Effective batch size: {eff_bs}, accumulation steps: {accumulation_steps}"
-    )
 
     # -------------------- Data --------------------
     loader_seed = cfg.dataloader.seed
@@ -230,7 +174,7 @@ if "__main__" == __name__:
         concat_dataset = ConcatDataset(dataset_ls)
         mixed_sampler = MixedBatchSampler(
             src_dataset_ls=dataset_ls,
-            batch_size=cfg.dataloader.max_train_batch_size,
+            batch_size=cfg.dataloader.train_batch_size,
             drop_last=True,
             prob=cfg_data.train.prob_ls,
             shuffle=True,
@@ -244,7 +188,7 @@ if "__main__" == __name__:
     else:
         train_loader = DataLoader(
             dataset=train_dataset,
-            batch_size=cfg.dataloader.max_train_batch_size,
+            batch_size=cfg.dataloader.train_batch_size,
             num_workers=cfg.dataloader.num_workers,
             shuffle=True,
             generator=loader_generator,
@@ -259,11 +203,26 @@ if "__main__" == __name__:
         )
         _val_loader = DataLoader(
             dataset=_val_dataset,
-            batch_size=1,
+            batch_size=cfg.dataloader.val_batch_size,
             shuffle=False,
             num_workers=cfg.dataloader.num_workers,
         )
         val_loaders.append(_val_loader)
+    # Test dataset
+    test_loaders: List[DataLoader] = []
+    for _test_dic in cfg_data.test:
+        _test_dataset = get_dataset(
+            _test_dic,
+            base_data_dir=base_data_dir,
+            mode=DatasetMode.EVAL,
+        )
+        _test_loader = DataLoader(
+            dataset=_test_dataset,
+            batch_size=cfg.dataloader.test_batch_size,
+            shuffle=False,
+            num_workers=cfg.dataloader.num_workers,
+        )
+        test_loaders.append(_test_loader)
 
     # -------------------- Model --------------------
     if cfg.model.name == 'TernausNet':
@@ -289,8 +248,8 @@ if "__main__" == __name__:
         device=device,
         out_dir_ckpt=out_dir_ckpt,
         out_dir_eval=out_dir_eval,
-        accumulation_steps=accumulation_steps,
         val_dataloaders=val_loaders,
+        test_dataloaders=test_loaders,
     )
 
     # -------------------- Checkpoint --------------------

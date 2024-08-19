@@ -26,6 +26,17 @@ dataset:
       resize_to_hw:
       - 256
       - 256
+  test:
+    - name: vkitti2
+      disp_name: vkitti2_test
+      dir: vkitti2
+      filenames: data_split/vkitti2_test.txt
+      kitti_bm_crop: True
+      valid_mask_crop: eigen
+      norm_name: vkitti2
+      resize_to_hw:
+      - 256
+      - 256
 
 model:
   name: TernausNet
@@ -60,8 +71,9 @@ augmentation_args:
 
 dataloader:
   num_workers: 2
-  effective_batch_size: 48
-  max_train_batch_size: 48
+  train_batch_size: 48
+  val_batch_size: 48
+  test_batch_size: 48
   seed: 2024  # to ensure continuity when resuming from checkpoint
 
 # Training settings
@@ -86,6 +98,7 @@ loss:
     reduction: mean
 
 lr: 3.0e-05
+
 lr_scheduler:
   name: IterExponential
   kwargs:
@@ -93,7 +106,7 @@ lr_scheduler:
     final_ratio: 0.01
     warmup_steps: 100
 
-# Validation (and visualization) settings
+# Validation settings
 validation:
   main_val_metric: abs_relative_difference
   main_val_metric_goal: minimize
