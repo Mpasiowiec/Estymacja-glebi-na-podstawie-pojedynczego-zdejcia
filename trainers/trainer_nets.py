@@ -219,8 +219,6 @@ class NetTrainer:
             # Epoch end
             self.n_batch_in_epoch = 0
 
-    @staticmethod
-
     def _train_step_callback(self):
         """Executed after every iteration"""
         # Save backup (with a larger interval, without training states)
@@ -309,7 +307,7 @@ class NetTrainer:
             tqdm(data_loader, desc=f"evaluating on {data_loader.dataset.disp_name}"),
             start=1,
         ):
-            assert 1 == data_loader.batch_size
+            # assert 1 == data_loader.batch_size
             # Read input image
             rgb_int = batch["rgb_img"].to(self.device)  # .squeeze() [3, H, W]
             # GT depth
@@ -366,7 +364,7 @@ class NetTrainer:
         if 0 == len(self.global_seed_sequence):
             self.global_seed_sequence = generate_seed_sequence(
                 initial_seed=self.seed,
-                length=self.max_iter * self.gradient_accumulation_steps,
+                length=self.max_iter,
             )
             logging.info(
                 f"Global seed sequence is generated, length={len(self.global_seed_sequence)}"

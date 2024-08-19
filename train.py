@@ -25,7 +25,8 @@ from util.depth_transform import (
     get_depth_normalizer,
 )
 from util.logging_util import(
-  config_logging
+  config_logging,
+  tb_logger
 )
 
 if "__main__" == __name__:
@@ -118,6 +119,9 @@ if "__main__" == __name__:
     out_dir_ckpt = os.path.join(out_dir_run, "checkpoint")
     if not os.path.exists(out_dir_ckpt):
         os.makedirs(out_dir_ckpt)
+    out_dir_tb = os.path.join(out_dir_run, "tensorboard")
+    if not os.path.exists(out_dir_tb):
+        os.makedirs(out_dir_tb)
     out_dir_eval = os.path.join(out_dir_run, "evaluation")
     if not os.path.exists(out_dir_eval):
         os.makedirs(out_dir_eval)
@@ -125,7 +129,7 @@ if "__main__" == __name__:
     # -------------------- Logging settings --------------------
     config_logging(cfg.logging, out_dir=out_dir_run)
     logging.debug(f"config: {cfg}")
-
+    tb_logger.set_dir(out_dir_tb)
     # -------------------- Device --------------------
     cuda_avail = torch.cuda.is_available() and not args.no_cuda
     device = torch.device("cuda" if cuda_avail else "cpu")
