@@ -331,12 +331,12 @@ class NetTrainer:
         ):
             assert 1 == data_loader.batch_size
             # Read input image
-            rgb_int = batch["rgb_img"].squeeze()  # [3, H, W]
+            rgb_int = batch["rgb_img"].to(self.device)  # .squeeze() [3, H, W]
             # GT depth
-            depth_raw_ts = batch["depth_raw_linear"].squeeze()
+            depth_raw_ts = batch["depth_raw_linear"] # .squeeze()
             depth_raw = depth_raw_ts.numpy()
             depth_raw_ts = depth_raw_ts.to(self.device)
-            valid_mask_ts = batch["valid_mask_raw"].squeeze()
+            valid_mask_ts = batch["valid_mask_raw"] # .squeeze()
             valid_mask = valid_mask_ts.numpy()
             valid_mask_ts = valid_mask_ts.to(self.device)
 

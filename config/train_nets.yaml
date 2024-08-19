@@ -1,9 +1,7 @@
 base_config:
 - config/logging.yaml
 - config/wandb.yaml
-- config/dataset/data_nyu_2.yaml
 - config/model_sdv2.yaml
-
 
 dataset:
   train:
@@ -14,6 +12,9 @@ dataset:
     kitti_bm_crop: true
     valid_mask_crop: null  # no valid_mask_crop for training
     norm_name: vkitti2
+    resize_to_hw:
+    - 256
+    - 256
   val:
     - name: vkitti2
       disp_name: vkitti2_val
@@ -22,6 +23,9 @@ dataset:
       kitti_bm_crop: true
       valid_mask_crop: eigen
       norm_name: vkitti2
+      resize_to_hw:
+      - 256
+      - 256
 
 model:
   name: TernausNet
@@ -56,8 +60,8 @@ augmentation_args:
 
 dataloader:
   num_workers: 2
-  effective_batch_size: 1
-  max_train_batch_size: 1
+  effective_batch_size: 48
+  max_train_batch_size: 48
   seed: 2024  # to ensure continuity when resuming from checkpoint
 
 # Training settings
