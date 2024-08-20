@@ -1,31 +1,41 @@
 import pandas as pd
 import torch
+from collections import defaultdict
 
 
 # Coppied from https://github.com/prs-eth/Marigold/blob/main/src/util/metric.py
 
-class MetricTracker:
-    def __init__(self, *keys, writer=None):
-        self.writer = writer
-        self._data = pd.DataFrame(index=keys, columns=["total", "counts", "average"])
+class MetricMonitor:
+    def __init__(self, float_precision=3):
+        self.float_precision = float_precision
         self.reset()
 
     def reset(self):
-        for col in self._data.columns:
-            self._data[col].values[:] = 0
+        self.metrics = defaultdict(lambda: {"val": 0, "count": 0, "avg": 0})
 
-    def update(self, key, value, n=1):
-        if self.writer is not None:
-            self.writer.add_scalar(key, value)
-        self._data.loc[key, "total"] += value * n
-        self._data.loc[key, "counts"] += n
-        self._data.loc[key, "average"] = self._data.total[key] / self._data.counts[key]
+    def update(self, metric_name, val, count):
+        metric = self.metrics[metric_name]
 
-    def avg(self, key):
-        return self._data.average[key]
+        metric["val"] += val
+        metric["count"] += count
+        metric["avg"] = metric["val"] / metric["count"]
+    
+    def load(self, file_path):
+        df = pd.read_csv(file_path)
+        for metric_name in df.columns:
+            self.metrics[metric_name]["val"] = df.at[0, metric_name]
+            self.metrics[metric_name]["count"] = df.at[1, metric_name]
+            self.metrics[metric_name]["avg"] = df.at[2, metric_name]
 
-    def result(self):
-        return dict(self._data.average)
+    def __str__(self):
+        return " | ".join(
+            [
+                "{metric_name}: {avg:.{float_precision}f}".format(
+                    metric_name=metric_name, avg=metric["avg"], float_precision=self.float_precision
+                )
+                for (metric_name, metric) in self.metrics.items()
+            ]
+        )
 
 
 def abs_relative_difference(output, target, valid_mask=None):
