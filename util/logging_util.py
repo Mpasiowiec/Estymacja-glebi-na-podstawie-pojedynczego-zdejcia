@@ -60,7 +60,7 @@ class MyTrainingLogger:
 
 
 # global instance
-tb_logger = MyTrainingLogger()
+# tb_logger = MyTrainingLogger()
 
 
 # -------------- wandb tools --------------

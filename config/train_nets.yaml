@@ -13,8 +13,8 @@ dataset:
     valid_mask_crop: null  # no valid_mask_crop for training
     norm_name: vkitti2
     resize_to_hw:
-    - 256
-    - 256
+    - 128
+    - 128
   val:
     - name: vkitti2
       disp_name: vkitti2_val
@@ -71,8 +71,8 @@ augmentation_args:
 
 dataloader:
   num_workers: 2
-  train_batch_size: 48
-  val_batch_size: 48
+  train_batch_size: 240
+  val_batch_size: 240
   test_batch_size: 48
   seed: 2024  # to ensure continuity when resuming from checkpoint
 

@@ -88,8 +88,10 @@ class NetTrainer:
         self.best_metric = 1e8 if "minimize" == self.main_val_metric_goal else -1e8
         
         self.model_data_train = pd.DataFrame({"epoch": []})
+        self.model_data_val = pd.DataFrame({"epoch": []})
         self.model_temp_data = pd.DataFrame({})
-        
+        self.metric_monitor_tr = MetricMonitor()
+        self.metric_monitor_vl = MetricMonitor()
         # Settings
         self.max_epoch = self.cfg.max_epoch
         self.max_iter = self.cfg.max_iter
@@ -123,14 +125,13 @@ class NetTrainer:
             self.epoch = epoch
             logging.debug(f"epoch: {self.epoch}")
 
-            self.metric_monitor_tr = MetricMonitor()
             self.model_data_train.at[self.epoch, 'epoch'] = self.epoch
             # Skip previous batches when resume
             for batch in tqdm(skip_first_batches(self.train_loader, self.n_batch_in_epoch), position=0, leave=True):
                 self.model.train()
 
                 # globally consistent random generators
-                if self.seed is not None:
+                if self.seed is None:
                     local_seed = self._get_next_seed()
                     rand_num_generator = torch.Generator(device=device)
                     rand_num_generator.manual_seed(local_seed)
@@ -164,7 +165,7 @@ class NetTrainer:
 
                 loss = batch_loss.mean()
                 
-                depth_pred: np.ndarray = model_pred.cpu().numpy()
+                depth_pred: np.ndarray = model_pred.cpu().detach().numpy()
                 # Clip to dataset min max
                 depth_pred = np.clip(
                     depth_pred,
@@ -262,22 +263,17 @@ class NetTrainer:
     def validate(self):
         for i, val_loader in enumerate(self.val_loaders):
             val_dataset_name = val_loader.dataset.disp_name
-            val_metric_dic = self.validate_single_dataset(
+            val_metric_monitor = self.validate_single_dataset(
                 data_loader=val_loader, metric_tracker=self.val_metrics
             )
             logging.info(
-                f"Iter {self.effective_iter}. Validation metrics on `{val_dataset_name}`: {val_metric_dic}"
-            )
-            tb_logger.log_dic(
-                {f"val/{val_dataset_name}/{k}": v for k, v in val_metric_dic.items()},
-                global_step=self.effective_iter,
+                f"Iter {self.effective_iter}. Validation metrics on `{val_dataset_name}`: {val_metric_monitor}"
             )
             # save to file
-            eval_text = eval_dic_to_text(
-                val_metrics=val_metric_dic,
-                dataset_name=val_dataset_name,
-                sample_list_path=val_loader.dataset.filename_ls_path,
-            )
+            for (metric_name, metric) in val_metric_monitor.items():
+              self.model_data_val.at[self.epoch, metric_name] = metric["avg"]
+            self.model_data_val.to_csv(os.path.join(self.out_dir_eval,f'eval_record.csv'), index=False)
+            
             _save_to = os.path.join(
                 self.out_dir_eval,
                 f"eval-{val_dataset_name}-iter{self.effective_iter:06d}.txt",
@@ -307,11 +303,11 @@ class NetTrainer:
     def validate_single_dataset(
         self,
         data_loader: DataLoader,
-        metric_tracker: MetricTracker,
+        metric_monitor: MetricMonitor,
         save_to_dir: str = None,
     ):
         self.model.to(self.device)
-        metric_tracker.reset()
+        metric_monitor.reset()
 
         # Generate seed sequence for consistent evaluation
         val_init_seed = self.cfg.validation.init_seed
@@ -325,8 +321,8 @@ class NetTrainer:
             # Read input image
             rgb_int = batch["rgb_img"].to(self.device)  # .squeeze() [3, H, W]
             # GT depth
-            depth_raw_ts = batch["depth_raw_linear"] # .squeeze()
-            depth_raw_ts = depth_raw_ts.to(self.device)
+            depth_ts = batch["depth_raw_norm"] # .squeeze()
+            depth_ts = depth_ts.to(self.device)
             valid_mask_ts = batch["valid_mask_raw"] # .squeeze()
             valid_mask_ts = valid_mask_ts.to(self.device)
 
@@ -341,7 +337,7 @@ class NetTrainer:
             # Predict depth
             model_pred = self.model(rgb_int)
 
-            depth_pred: np.ndarray = model_pred.cpu().numpy()
+            depth_pred: np.ndarray = model_pred.detach().cpu().numpy()
 
             # Clip to dataset min max
             depth_pred = np.clip(
@@ -359,18 +355,11 @@ class NetTrainer:
 
             for met_func in self.metric_funcs:
                 _metric_name = met_func.__name__
-                _metric = met_func(depth_pred_ts, depth_raw_ts, valid_mask_ts).item()
+                _metric = met_func(depth_pred_ts, depth_ts, valid_mask_ts).item()
                 sample_metric.append(_metric.__str__())
-                metric_tracker.update(_metric_name, _metric)
+                metric_monitor.update(_metric_name, _metric, rgb_int.shape[0])
 
-            # Save as 16-bit uint png
-            if save_to_dir is not None:
-                img_name = batch["rgb_relative_path"][0].replace("/", "_")
-                png_save_path = os.path.join(save_to_dir, f"{img_name}.png")
-                depth_to_save = (model_pred.cpu().numpy() * 65535.0).astype(np.uint16)
-                Image.fromarray(depth_to_save).save(png_save_path, mode="I;16")
-
-        return metric_tracker.result()
+        return metric_monitor
 
     def _get_next_seed(self):
         if 0 == len(self.global_seed_sequence):
@@ -424,10 +413,10 @@ class NetTrainer:
 
             logging.info(f"Trainer state is saved to: {train_state_path}")        
 
-        for (metric_name, metric) in self.metric_monitor_tr.items():
-                self.model_temp_data.at[0, metric_name] = metric["val"]
-                self.model_temp_data.at[1, metric_name] = metric["count"]
-                self.model_temp_data.at[2, metric_name] = metric["avg"]
+        for metric_name in self.metric_monitor_tr.metrics:
+                self.model_temp_data.at[0, metric_name] = self.metric_monitor_tr.metrics[metric_name]["val"]
+                self.model_temp_data.at[1, metric_name] = self.metric_monitor_tr.metrics[metric_name]["count"]
+                self.model_temp_data.at[2, metric_name] = self.metric_monitor_tr.metrics[metric_name]["avg"]
         self.model_temp_data.to_csv(os.path.join(self.out_dir_tr,'temp_record.csv'), index=False)
             
         
@@ -467,6 +456,8 @@ class NetTrainer:
                 logging.info(f"LR scheduler state is loaded from {ckpt_path}")
 
         self.metric_monitor_tr.load(os.path.join(self.out_dir_tr,'temp_record.csv'))
+        if os.path.exists(os.path.join(self.out_dir_eval,'eval_record.csv')):
+          self.metric_monitor_eval.load(os.path.join(self.out_dir_eval,'eval_record.csv'))
         
         logging.info(
             f"Checkpoint loaded from: {ckpt_path}. Resume from iteration {self.effective_iter} (epoch {self.epoch})"

@@ -15,7 +15,7 @@ from models.TernausNet import UNet16
 
 from datasets import BaseDepthDataset, DatasetMode, get_dataset
 from datasets.mixed_sampler import MixedBatchSampler
-from trainers.trainer_nets import NetTrainer
+from trainers.mytrainer import NetTrainer
 from util.config_util import (
     find_value_in_omegaconf,
     recursive_load_config,
@@ -25,8 +25,7 @@ from util.depth_transform import (
     get_depth_normalizer,
 )
 from util.logging_util import(
-  config_logging,
-  tb_logger
+  config_logging
 )
 
 if "__main__" == __name__:
@@ -119,17 +118,16 @@ if "__main__" == __name__:
     out_dir_ckpt = os.path.join(out_dir_run, "checkpoint")
     if not os.path.exists(out_dir_ckpt):
         os.makedirs(out_dir_ckpt)
-    out_dir_tb = os.path.join(out_dir_run, "tensorboard")
-    if not os.path.exists(out_dir_tb):
-        os.makedirs(out_dir_tb)
-    out_dir_eval = os.path.join(out_dir_run, "evaluation")
+    out_dir_tr = os.path.join(out_dir_run, "training_record")
+    if not os.path.exists(out_dir_tr):
+        os.makedirs(out_dir_tr)
+    out_dir_eval = os.path.join(out_dir_run, "evaluation_record")
     if not os.path.exists(out_dir_eval):
         os.makedirs(out_dir_eval)
 
     # -------------------- Logging settings --------------------
     config_logging(cfg.logging, out_dir=out_dir_run)
     logging.debug(f"config: {cfg}")
-    tb_logger.set_dir(out_dir_tb)
     # -------------------- Device --------------------
     cuda_avail = torch.cuda.is_available() and not args.no_cuda
     device = torch.device("cuda" if cuda_avail else "cpu")
@@ -251,6 +249,7 @@ if "__main__" == __name__:
         train_dataloader=train_loader,
         device=device,
         out_dir_ckpt=out_dir_ckpt,
+        out_dir_tr=out_dir_tr,
         out_dir_eval=out_dir_eval,
         val_dataloaders=val_loaders,
         test_dataloaders=test_loaders,
