@@ -271,7 +271,7 @@ if "__main__" == __name__:
         out_dir_ckpt=out_dir_ckpt,
         out_dir_tr=out_dir_tr,
         out_dir_eval=out_dir_eval,
-        val_dataloaders=val_loaders,
+        val_dataloader=val_loader,
         test_dataloaders=test_loaders,
     )
 
