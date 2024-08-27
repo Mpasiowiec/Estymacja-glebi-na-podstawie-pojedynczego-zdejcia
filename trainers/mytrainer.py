@@ -26,7 +26,6 @@ from util.data_loader import skip_first_batches
 from util.logging_util import eval_dic_to_text
 from util.loss import get_loss
 from util.lr_scheduler import IterExponential
-from util.metric import MetricMonitor
 from util.alignment import align_depth_least_square
 from util.seeding import generate_seed_sequence
 
@@ -40,7 +39,7 @@ class NetTrainer:
         out_dir_ckpt,
         out_dir_tr,
         out_dir_eval,
-        val_dataloaders: List[DataLoader] = None,
+        val_dataloader: DataLoader,
         test_dataloaders: List[DataLoader] = None,
     ):
         self.cfg: OmegaConf = cfg
@@ -53,7 +52,7 @@ class NetTrainer:
         self.out_dir_tr = out_dir_tr
         self.out_dir_eval = out_dir_eval
         self.train_loader: DataLoader = train_dataloader
-        self.val_loaders: List[DataLoader] = val_dataloaders
+        self.val_loader: DataLoader = val_dataloader
 
         # Optimizer !should be defined after input layer is adapted
         lr = self.cfg.lr
@@ -90,8 +89,8 @@ class NetTrainer:
         self.model_data_train = pd.DataFrame({"epoch": []})
         self.model_data_val = pd.DataFrame({"epoch": []})
         self.model_temp_data = pd.DataFrame({})
-        self.metric_monitor_tr = MetricMonitor()
-        self.metric_monitor_vl = MetricMonitor()
+        self.metric_monitor_tr = metric.MetricMonitor()
+        self.metric_monitor_vl = metric.MetricMonitor()
         # Settings
         self.max_epoch = self.cfg.max_epoch
         self.max_iter = self.cfg.max_iter
@@ -99,7 +98,6 @@ class NetTrainer:
         self.gt_mask_type = self.cfg.gt_mask_type
         self.save_period = self.cfg.trainer.save_period
         self.backup_period = self.cfg.trainer.backup_period
-        self.val_period = self.cfg.trainer.validation_period
 
 
         # Internal variables
@@ -197,7 +195,7 @@ class NetTrainer:
 
                 accumulated_loss = self.metric_monitor_tr.metrics['loss']['avg']
 
-                logging.info(
+                logging.debug(
                     f"iter {self.effective_iter:5d} (epoch {epoch:2d}): loss={accumulated_loss:.5f}"
                 )
                 logging.debug(
@@ -227,14 +225,13 @@ class NetTrainer:
                 torch.cuda.empty_cache()
                 # <<< Effective batch end <<<
             
-            for (metric_name, metric) in self.metric_monitor_tr.items():
-                self.model_data_train.at[self.epoch, metric_name] = metric["avg"]
+            for metric_name in self.metric_monitor_tr.metrics:
+                self.model_data_train.at[self.epoch, metric_name] = self.metric_monitor_tr.metrics[metric_name]["avg"]
             self.model_data_train.to_csv(os.path.join(self.out_dir_tr,'train_record.csv'), index=False)
-            
+            self.metric_monitor_tr.reset()
             # Validation
             self.in_evaluation = True  # flag to do evaluation in resume run if validation is not finished
             self.save_checkpoint(ckpt_name="latest", save_train_state=True)
-            _is_latest_saved = True
             self.validate()
             self.in_evaluation = False
             self.save_checkpoint(ckpt_name="latest", save_train_state=True)
@@ -250,71 +247,26 @@ class NetTrainer:
                 ckpt_name=self._get_backup_ckpt_name(), save_train_state=False
             )
 
-        _is_latest_saved = False
-
         # Save training checkpoint (can be resumed)
         if (
             self.save_period > 0
             and 0 == self.effective_iter % self.save_period
-            and not _is_latest_saved
         ):
             self.save_checkpoint(ckpt_name="latest", save_train_state=True)
 
-    def validate(self):
-        for i, val_loader in enumerate(self.val_loaders):
-            val_dataset_name = val_loader.dataset.disp_name
-            val_metric_monitor = self.validate_single_dataset(
-                data_loader=val_loader, metric_tracker=self.val_metrics
-            )
-            logging.info(
-                f"Iter {self.effective_iter}. Validation metrics on `{val_dataset_name}`: {val_metric_monitor}"
-            )
-            # save to file
-            for (metric_name, metric) in val_metric_monitor.items():
-              self.model_data_val.at[self.epoch, metric_name] = metric["avg"]
-            self.model_data_val.to_csv(os.path.join(self.out_dir_eval,f'eval_record.csv'), index=False)
-            
-            _save_to = os.path.join(
-                self.out_dir_eval,
-                f"eval-{val_dataset_name}-iter{self.effective_iter:06d}.txt",
-            )
-            with open(_save_to, "w+") as f:
-                f.write(eval_text)
-
-            # Update main eval metric
-            if 0 == i:
-                main_eval_metric = val_metric_dic[self.main_val_metric]
-                if (
-                    "minimize" == self.main_val_metric_goal
-                    and main_eval_metric < self.best_metric
-                    or "maximize" == self.main_val_metric_goal
-                    and main_eval_metric > self.best_metric
-                ):
-                    self.best_metric = main_eval_metric
-                    logging.info(
-                        f"Best metric: {self.main_val_metric} = {self.best_metric} at iteration {self.effective_iter}"
-                    )
-                    # Save a checkpoint
-                    self.save_checkpoint(
-                        ckpt_name=self._get_backup_ckpt_name(), save_train_state=False
-                    )
-
     @torch.no_grad()
-    def validate_single_dataset(
-        self,
-        data_loader: DataLoader,
-        metric_monitor: MetricMonitor,
-        save_to_dir: str = None,
-    ):
+    def validate(self):
+        val_dataset_name = self.val_loader.dataset.disp_name
+        
         self.model.to(self.device)
-        metric_monitor.reset()
+        self.metric_monitor_vl.reset()
 
         # Generate seed sequence for consistent evaluation
         val_init_seed = self.cfg.validation.init_seed
-        val_seed_ls = generate_seed_sequence(val_init_seed, len(data_loader))
+        val_seed_ls = generate_seed_sequence(val_init_seed, len(self.val_loader))
 
         for i, batch in enumerate(
-            tqdm(data_loader, desc=f"evaluating on {data_loader.dataset.disp_name}"),
+            tqdm(self.val_loader, desc=f"evaluating on {self.val_loader.dataset.disp_name}"),
             start=1,
         ):
             # assert 1 == data_loader.batch_size
@@ -342,8 +294,8 @@ class NetTrainer:
             # Clip to dataset min max
             depth_pred = np.clip(
                 depth_pred,
-                a_min=data_loader.dataset.min_depth,
-                a_max=data_loader.dataset.max_depth,
+                a_min=self.val_loader.dataset.min_depth,
+                a_max=self.val_loader.dataset.max_depth,
             )
 
             # clip to d > 0 for evaluation
@@ -357,9 +309,33 @@ class NetTrainer:
                 _metric_name = met_func.__name__
                 _metric = met_func(depth_pred_ts, depth_ts, valid_mask_ts).item()
                 sample_metric.append(_metric.__str__())
-                metric_monitor.update(_metric_name, _metric, rgb_int.shape[0])
+                self.metric_monitor_vl.update(_metric_name, _metric, rgb_int.shape[0])        
+        
+        logging.info(
+            f"Iter {self.effective_iter}. Validation metrics on `{val_dataset_name}`: {self.metric_monitor_vl}"
+        )
+        # save to file
+        self.model_data_val.at[self.epoch, 'epoch'] = self.epoch
+        for metric_name in self.metric_monitor_vl.metrics:
+            self.model_data_val.at[self.epoch, metric_name] = self.metric_monitor_vl.metrics[metric_name]["avg"]
+        self.model_data_val.to_csv(os.path.join(self.out_dir_eval,f'eval_record.csv'), index=False)
 
-        return metric_monitor
+        # Update main eval metric
+        main_eval_metric = self.metric_monitor_vl.metrics[self.main_val_metric]["avg"]
+        if (
+            "minimize" == self.main_val_metric_goal
+            and main_eval_metric < self.best_metric
+            or "maximize" == self.main_val_metric_goal
+            and main_eval_metric > self.best_metric
+        ):
+            self.best_metric = main_eval_metric
+            logging.info(
+                f"Best metric: {self.main_val_metric} = {self.best_metric} at iteration {self.effective_iter}"
+            )
+            # Save a checkpoint
+            self.save_checkpoint(
+                ckpt_name=self._get_backup_ckpt_name(), save_train_state=False
+            )
 
     def _get_next_seed(self):
         if 0 == len(self.global_seed_sequence):
@@ -456,9 +432,9 @@ class NetTrainer:
                 logging.info(f"LR scheduler state is loaded from {ckpt_path}")
 
         self.metric_monitor_tr.load(os.path.join(self.out_dir_tr,'temp_record.csv'))
+        self.model_data_train = pd.read_csv(os.path.join(self.out_dir_tr,'temp_record.csv'))
         if os.path.exists(os.path.join(self.out_dir_eval,'eval_record.csv')):
-          self.metric_monitor_eval.load(os.path.join(self.out_dir_eval,'eval_record.csv'))
-        
+            self.model_data_val = pd.read_csv(os.path.join(self.out_dir_eval,'eval_record.csv'))
         logging.info(
             f"Checkpoint loaded from: {ckpt_path}. Resume from iteration {self.effective_iter} (epoch {self.epoch})"
         )

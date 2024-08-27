@@ -196,27 +196,47 @@ if "__main__" == __name__:
             generator=loader_generator,
         )
     # Validation dataset
-    val_loaders: List[DataLoader] = []
-    for _val_dic in cfg_data.val:
-        _val_dataset = get_dataset(
-            _val_dic,
-            base_data_dir=base_data_dir,
-            mode=DatasetMode.EVAL,
-        )
-        _val_loader = DataLoader(
-            dataset=_val_dataset,
+    val_dataset: BaseDepthDataset = get_dataset(
+        cfg_data.val,
+        base_data_dir=base_data_dir,
+        mode=DatasetMode.TRAIN,
+        depth_transform=depth_transform,
+    )
+    if "mixed" == cfg_data.val.name:
+        dataset_ls = val_dataset
+        assert len(cfg_data.val.prob_ls) == len(
+            dataset_ls
+        ), "Lengths don't match: `prob_ls` and `dataset_list`"
+        concat_dataset = ConcatDataset(dataset_ls)
+        mixed_sampler = MixedBatchSampler(
+            src_dataset_ls=dataset_ls,
             batch_size=cfg.dataloader.val_batch_size,
+            drop_last=True,
+            prob=cfg_data.val.prob_ls,
             shuffle=False,
+            generator=loader_generator,
+        )
+        val_loader = DataLoader(
+            concat_dataset,
+            batch_sampler=mixed_sampler,
             num_workers=cfg.dataloader.num_workers,
         )
-        val_loaders.append(_val_loader)
+    else:
+        val_loader = DataLoader(
+            dataset=val_dataset,
+            batch_size=cfg.dataloader.val_batch_size,
+            num_workers=cfg.dataloader.num_workers,
+            shuffle=False,
+            generator=loader_generator,
+        )
     # Test dataset
     test_loaders: List[DataLoader] = []
     for _test_dic in cfg_data.test:
         _test_dataset = get_dataset(
             _test_dic,
             base_data_dir=base_data_dir,
-            mode=DatasetMode.EVAL,
+            mode=DatasetMode.TRAIN,
+            depth_transform=depth_transform,
         )
         _test_loader = DataLoader(
             dataset=_test_dataset,
