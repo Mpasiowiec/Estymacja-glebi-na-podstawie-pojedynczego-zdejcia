@@ -180,7 +180,7 @@ class NetTrainer:
                     _metric = met_func(depth_pred_ts, depth_gt, valid_mask).item()
                     sample_metric.append(_metric.__str__())
                     self.metric_monitor_tr.update(_metric_name, _metric, self.batch_size)                
-
+                
                 self.metric_monitor_tr.update("loss", loss.item(), self.batch_size)
                 
                 loss.backward()
@@ -273,9 +273,9 @@ class NetTrainer:
             # Read input image
             rgb_int = batch["rgb_img"].to(self.device)  # .squeeze() [3, H, W]
             # GT depth
-            depth_ts = batch["depth_raw_norm"] # .squeeze()
+            depth_ts = batch[self.gt_depth_type] # .squeeze()
             depth_ts = depth_ts.to(self.device)
-            valid_mask_ts = batch["valid_mask_raw"] # .squeeze()
+            valid_mask_ts = batch[self.gt_mask_type] # .squeeze()
             valid_mask_ts = valid_mask_ts.to(self.device)
 
             # Random number generator
@@ -288,6 +288,13 @@ class NetTrainer:
 
             # Predict depth
             model_pred = self.model(rgb_int)
+
+            # Masked loss
+            batch_loss = self.loss(
+                  model_pred[valid_mask_ts].float(),
+                  depth_ts[valid_mask_ts].float(),
+              )
+            loss = batch_loss.mean()
 
             depth_pred: np.ndarray = model_pred.detach().cpu().numpy()
 
@@ -309,7 +316,8 @@ class NetTrainer:
                 _metric_name = met_func.__name__
                 _metric = met_func(depth_pred_ts, depth_ts, valid_mask_ts).item()
                 sample_metric.append(_metric.__str__())
-                self.metric_monitor_vl.update(_metric_name, _metric, rgb_int.shape[0])        
+                self.metric_monitor_vl.update(_metric_name, _metric, rgb_int.shape[0])
+            self.metric_monitor_vl.update("loss", loss.item(), rgb_int.shape[0])       
         
         logging.info(
             f"Iter {self.effective_iter}. Validation metrics on `{val_dataset_name}`: {self.metric_monitor_vl}"
@@ -432,7 +440,7 @@ class NetTrainer:
                 logging.info(f"LR scheduler state is loaded from {ckpt_path}")
 
         self.metric_monitor_tr.load(os.path.join(self.out_dir_tr,'temp_record.csv'))
-        self.model_data_train = pd.read_csv(os.path.join(self.out_dir_tr,'temp_record.csv'))
+        self.model_data_train = pd.read_csv(os.path.join(self.out_dir_tr,'train_record.csv'))
         if os.path.exists(os.path.join(self.out_dir_eval,'eval_record.csv')):
             self.model_data_val = pd.read_csv(os.path.join(self.out_dir_eval,'eval_record.csv'))
         logging.info(

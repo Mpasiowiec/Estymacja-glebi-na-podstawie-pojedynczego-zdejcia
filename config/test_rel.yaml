@@ -42,9 +42,9 @@ model:
 depth_normalization:
   type: scale_shift_depth
   clip: true
-  norm_min: -1.0
+  norm_min: 0.000001
   norm_max: 1.0
-  min_max_quantile: 0.02
+  min_max_quantile: 0.01
 
 augmentation_args:
   random_horizontal_flip:
@@ -76,17 +76,17 @@ dataloader:
 # Training settings
 trainer:
   init_seed: 2024  # use null to train w/o seeding
-  save_period: 3
+  save_period: 10
   backup_period: 2000
 
 gt_depth_type: depth_raw_norm
 gt_mask_type: valid_mask_raw
 
-max_epoch: 100  # a large enough number
-max_iter: 30000  # usually converges at around 20k
+max_epoch: 10  # a large enough number
+max_iter: 100  # usually converges at around 20k
 
 optimizer:
-  name: Adam
+  name: SGD
 
 loss:
   name: mse_loss
