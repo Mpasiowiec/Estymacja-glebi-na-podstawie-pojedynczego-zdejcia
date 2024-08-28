@@ -259,10 +259,17 @@ class BaseDepthDataset(Dataset):
             JIT_transform = ColorJitter(**self.augm_args.jitter.args)
             if random.random() < self.augm_args.jitter.p:
                 rasters_dict = {k: JIT_transform(v) if 'rgb_img'==k else v for k, v in rasters_dict.items()}
+        #  red_green_channel_swap:
+            elif self.augm_args.red_green_channel_swap.in_use :
+                if random.random() < self.augm_args.red_green_channel_swap.p:
+                    im = rasters_dict['rgb_img'].convert('RGB')
+                    r, g, b = im.split()
+                    result = Image.merge('RGB', (g, r, b))
+                    rasters_dict['rgb_img'] = result
         # random_horizontal_flip:
         if self.augm_args.random_horizontal_flip.in_use :
             if random.random() < self.augm_args.random_horizontal_flip.p:
-                rasters_dict = {k: RandomHorizontalFlip(p=1)(v) for k, v in rasters_dict.items()}        
+                rasters_dict = {k: RandomHorizontalFlip(p=1)(v) for k, v in rasters_dict.items()}     
         # this augmentaion for relative depth and needs rescale norm depth
         # random_resize_crop:
         # if self.augm_args.random_resize_crop.in_use :
@@ -270,13 +277,6 @@ class BaseDepthDataset(Dataset):
         #     params = crop.get_params(rasters_dict[list(rasters_dict.keys())[0]],  scale=(0.08, 1.0), ratio=(0.75, 1.33))
         #     if random.random() < self.augm_args.random_resize_crop.p:
         #         rasters_dict = {k: functional.crop(v, *params) for k, v in rasters_dict.items()}
-        #  red_green_channel_swap:
-        if self.augm_args.red_green_channel_swap.in_use :
-            if random.random() < self.augm_args.red_green_channel_swap.p:
-                im = rasters_dict['rgb_img'].convert('RGB')
-                r, g, b = im.split()
-                result = Image.merge('RGB', (g, r, b))
-                rasters_dict['rgb_img'] = result
         
         rasters_dict = {k: self.trans(v) if k == "rgb_img" else v for k, v in rasters_dict.items()}
 

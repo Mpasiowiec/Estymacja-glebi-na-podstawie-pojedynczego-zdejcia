@@ -186,6 +186,7 @@ if "__main__" == __name__:
             concat_dataset,
             batch_sampler=mixed_sampler,
             num_workers=cfg.dataloader.num_workers,
+            pin_memory=cfg.dataloader.pin_memory, 
         )
     else:
         train_loader = DataLoader(
@@ -194,6 +195,7 @@ if "__main__" == __name__:
             num_workers=cfg.dataloader.num_workers,
             shuffle=True,
             generator=loader_generator,
+            pin_memory=cfg.dataloader.pin_memory,
         )
     # Validation dataset
     val_dataset: BaseDepthDataset = get_dataset(
@@ -220,6 +222,7 @@ if "__main__" == __name__:
             concat_dataset,
             batch_sampler=mixed_sampler,
             num_workers=cfg.dataloader.num_workers,
+            pin_memory=cfg.dataloader.pin_memory,
         )
     else:
         val_loader = DataLoader(
@@ -228,6 +231,7 @@ if "__main__" == __name__:
             num_workers=cfg.dataloader.num_workers,
             shuffle=False,
             generator=loader_generator,
+            pin_memory=cfg.dataloader.pin_memory,
         )
     # Test dataset
     test_loaders: List[DataLoader] = []
@@ -243,6 +247,7 @@ if "__main__" == __name__:
             batch_size=cfg.dataloader.test_batch_size,
             shuffle=False,
             num_workers=cfg.dataloader.num_workers,
+            pin_memory=cfg.dataloader.pin_memory,
         )
         test_loaders.append(_test_loader)
 

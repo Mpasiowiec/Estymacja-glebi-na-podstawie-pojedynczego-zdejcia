@@ -221,6 +221,7 @@ class FeatureFusionBlock(nn.Module):
         output = xs[0]
 
         if len(xs) == 2:
+            print(xs[0].shape, xs[1].shape, self.resConfUnit1(xs[1]).shape)
             output += self.resConfUnit1(xs[1])
 
         output = self.resConfUnit2(output)

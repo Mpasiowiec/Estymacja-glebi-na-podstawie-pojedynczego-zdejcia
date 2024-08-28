@@ -13,19 +13,19 @@ dataset:
     valid_mask_crop: null  # no valid_mask_crop for training
     norm_name: vkitti2
     resize_to_hw:
-    - 128
-    - 128
+    - 256
+    - 512
   val:
-    - name: vkitti2
-      disp_name: vkitti2_val
-      dir: vkitti2
-      filenames: data_split/vkitti2_val.txt
-      kitti_bm_crop: true
-      valid_mask_crop: eigen
-      norm_name: vkitti2
-      resize_to_hw:
-      - 256
-      - 256
+    name: vkitti2
+    disp_name: vkitti2_val
+    dir: vkitti2
+    filenames: data_split/vkitti2_val.txt
+    kitti_bm_crop: true
+    valid_mask_crop: eigen
+    norm_name: vkitti2
+    resize_to_hw:
+    - 141
+    - 486
   test:
     - name: vkitti2
       disp_name: vkitti2_test
@@ -39,55 +39,56 @@ dataset:
       - 256
 
 model:
-  name: TernausNet
-  backbone: vgg16
+  name: MiDas
+  backbone: densenet161
 
 depth_normalization:
   type: scale_shift_depth
   clip: true
-  norm_min: -1.0
+  norm_min: 0.000001
   norm_max: 1.0
-  min_max_quantile: 0.02
+  min_max_quantile: 0.01
 
 augmentation_args:
   random_horizontal_flip:
-    in_use: false
+    in_use: true
     p: 0.5
   jitter:
-    in_use: false
-    p: 0.5
+    in_use: true
+    p: 0.25
     args:
       hue: 0.1
       brightness: 0.1
       contrast: 0.1
   cutdepth:
-    in_use: false
+    in_use: true
     p: 0.5
     depth_type: linear
     par: 0.5
   red_green_channel_swap:
-    in_use: false
-    p: 0.5
+    in_use: true
+    p: 0.25
 
 dataloader:
-  num_workers: 2
-  train_batch_size: 240
-  val_batch_size: 240
+  num_workers: 8
+  pin_memory: true
+  train_batch_size: 128
+  val_batch_size: 128
   test_batch_size: 48
   seed: 2024  # to ensure continuity when resuming from checkpoint
 
 # Training settings
 trainer:
   init_seed: 2024  # use null to train w/o seeding
-  save_period: 50
+  save_period: 10
   backup_period: 2000
   validation_period: 2000
 
-gt_depth_type: depth_raw_norm
+gt_depth_type: depth_raw_linear
 gt_mask_type: valid_mask_raw
 
 max_epoch: 100  # a large enough number
-max_iter: 250  # usually converges at around 20k
+max_iter: 100  # usually converges at around 20k
 
 optimizer:
   name: Adam
