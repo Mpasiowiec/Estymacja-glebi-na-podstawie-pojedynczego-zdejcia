@@ -16,3 +16,6 @@ dataset_list:
   kitti_bm_crop: true
   valid_mask_crop: null
   norm_name: mixed
+  resize_to_hw:
+  - 160
+  - 544

@@ -109,7 +109,8 @@ class NetTrainer:
 
     def train(self, t_end=None):
         logging.info("Start training")
-
+        train_start = datetime.now()
+        
         device = self.device
         self.model.to(device)
 
@@ -214,12 +215,14 @@ class NetTrainer:
                         ckpt_name=self._get_backup_ckpt_name(),
                         save_train_state=False,
                     )
-                    logging.info("Training ended.")
+                    time_elapsed = (datetime.now() - train_start).total_seconds()      
+                    logging.info(f'Training ended. Training time: {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
                     return
                 # Time's up
                 elif t_end is not None and datetime.now() >= t_end:
                     self.save_checkpoint(ckpt_name="latest", save_train_state=True)
-                    logging.info("Time is up, training paused.")
+                    time_elapsed = (datetime.now() - train_start).total_seconds()
+                    logging.info(f'Time is up, training paused. Training time: {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
                     return
 
                 torch.cuda.empty_cache()
@@ -238,6 +241,9 @@ class NetTrainer:
 
             # Epoch end
             self.n_batch_in_epoch = 0
+            
+        time_elapsed = (datetime.now() - train_start).total_seconds()      
+        logging.info(f'Training ended. Training time: {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
 
     def _train_step_callback(self):
         """Executed after every iteration"""

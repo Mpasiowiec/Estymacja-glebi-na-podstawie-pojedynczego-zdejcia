@@ -3,41 +3,61 @@ base_config:
 - config/wandb.yaml
 - config/model_sdv2.yaml
 
+dataloader:
+  num_workers: 8
+  pin_memory: true
+  train_batch_size: 128
+  val_batch_size: 128
+  test_batch_size: 48
+  seed: 2024  # to ensure continuity when resuming from checkpoint
+
+# Training settings
+trainer:
+  init_seed: 2024  # use null to train w/o seeding
+  save_period: 10
+  backup_period: 2000
+
+gt_depth_type: depth_raw_linear
+gt_mask_type: valid_mask_raw
+
+max_epoch: 1  # a large enough number
+max_iter: 100  # usually converges at around 20k
+
 dataset:
   train:
     name: nyu_v2
     disp_name: nyu_v2
     dir: nyu_v2
-    filenames: data_split/nyu_2_paths1.txt
+    filenames: data_split/nyu_2_paths.txt
     eigen_valid_mask: true
     norm_name: nyu
     resize_to_hw:
-    - 128
-    - 128
+    - 256
+    - 352
   val:
     name: nyu_v2
     disp_name: nyu_v2
     dir: nyu_v2
-    filenames: data_split/nyu_2_paths1.txt
+    filenames: data_split/nyu_2_paths.txt
     eigen_valid_mask: true
     norm_name: nyu
     resize_to_hw:
-    - 128
-    - 128
+    - 256
+    - 352
   test:
     - name: nyu_v2
       disp_name: nyu_v2
       dir: nyu_v2
-      filenames: data_split/nyu_2_paths1.txt
+      filenames: data_split/nyu_2_paths.txt
       eigen_valid_mask: true
       norm_name: nyu
       resize_to_hw:
-      - 128
-      - 128
+      - 256
+      - 352
 
 model:
-  name: TernausNet
-  backbone: vgg16
+  name: MiDas
+  backbone: densenet161
 
 depth_normalization:
   type: scale_shift_depth
@@ -52,7 +72,7 @@ augmentation_args:
     p: 0.5
   jitter:
     in_use: true
-    p: 0.5
+    p: 0.25
     args:
       hue: 0.1
       brightness: 0.1
@@ -64,29 +84,10 @@ augmentation_args:
     par: 0.5
   red_green_channel_swap:
     in_use: true
-    p: 0.5
-
-dataloader:
-  num_workers: 0
-  train_batch_size: 5
-  val_batch_size: 5
-  test_batch_size: 5
-  seed: 2024  # to ensure continuity when resuming from checkpoint
-
-# Training settings
-trainer:
-  init_seed: 2024  # use null to train w/o seeding
-  save_period: 10
-  backup_period: 2000
-
-gt_depth_type: depth_raw_norm
-gt_mask_type: valid_mask_raw
-
-max_epoch: 10  # a large enough number
-max_iter: 100  # usually converges at around 20k
+    p: 0.25
 
 optimizer:
-  name: SGD
+  name: AdamW
 
 loss:
   name: mse_loss
