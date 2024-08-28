@@ -201,7 +201,7 @@ class FeatureFusionBlock(nn.Module):
     """Feature fusion block.
     """
 
-    def __init__(self, features):
+    def __init__(self, features, factor=2):
         """Init.
 
         Args:
@@ -211,6 +211,7 @@ class FeatureFusionBlock(nn.Module):
 
         self.resConfUnit1 = ResidualConvUnit(features)
         self.resConfUnit2 = ResidualConvUnit(features)
+        self.factor = factor
 
     def forward(self, *xs):
         """Forward pass.
@@ -221,13 +222,12 @@ class FeatureFusionBlock(nn.Module):
         output = xs[0]
 
         if len(xs) == 2:
-            print(xs[0].shape, xs[1].shape, self.resConfUnit1(xs[1]).shape)
             output += self.resConfUnit1(xs[1])
 
         output = self.resConfUnit2(output)
 
         output = nn.functional.interpolate(
-            output, scale_factor=2, mode="bilinear", align_corners=True
+            output, scale_factor=self.factor, mode="bilinear", align_corners=True
         )
 
         return output
@@ -255,10 +255,10 @@ class MidasNet(BaseModel):
 
         self.pretrained, self.scratch = _make_encoder(backbone=backbone, features=features, use_pretrained=use_pretrained)
 
-        self.scratch.refinenet4 = FeatureFusionBlock(features)
+        self.scratch.refinenet4 = FeatureFusionBlock(features, factor = 1 if backbone == 'densenet161' else 2)
         self.scratch.refinenet3 = FeatureFusionBlock(features)
         self.scratch.refinenet2 = FeatureFusionBlock(features)
-        self.scratch.refinenet1 = FeatureFusionBlock(features)
+        self.scratch.refinenet1 = FeatureFusionBlock(features, factor = 4 if backbone == 'densenet161' else 2)
 
         self.scratch.output_conv = nn.Sequential(
             nn.Conv2d(features, 128, kernel_size=3, stride=1, padding=1),

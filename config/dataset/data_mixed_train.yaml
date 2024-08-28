@@ -6,8 +6,8 @@ dataset_list:
   dir: hypersim/data
   filenames: data_split/hypersim_train.txt
   resize_to_hw:
-  - 480
-  - 640
+  - 256
+  - 352
   norm_name: mixed
 - name: vkitti2
   disp_name: vkitti2_train

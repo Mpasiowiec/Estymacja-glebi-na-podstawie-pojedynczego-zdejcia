@@ -4,3 +4,6 @@ dir: nyu_v2
 filenames: data_split/nyu_2_paths.txt
 eigen_valid_mask: true
 norm_name: nyu
+resize_to_hw:
+- 256
+- 352

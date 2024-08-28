@@ -5,3 +5,6 @@ filenames: data_split/vkitti2_train.txt
 kitti_bm_crop: true
 valid_mask_crop: null  # no valid_mask_crop for training
 norm_name: vkitti2
+resize_to_hw:
+- 160
+- 544

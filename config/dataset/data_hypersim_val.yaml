@@ -3,3 +3,6 @@ disp_name: hypersim_val
 dir: hypersim/data
 filenames: data_split/hypersim_val.txt
 norm_name: hypersim
+resize_to_hw:
+- 256
+- 352
