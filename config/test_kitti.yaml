@@ -1,20 +1,19 @@
 base_config:
 - config/logging.yaml
-- config/wandb.yaml
 - config/model_sdv2.yaml
 
 dataloader:
   num_workers: 8
   pin_memory: true
-  train_batch_size: 128
-  val_batch_size: 128
+  train_batch_size: 20
+  val_batch_size: 20
   test_batch_size: 48
   seed: 2024  # to ensure continuity when resuming from checkpoint
 
 # Training settings
 trainer:
   init_seed: 2024  # use null to train w/o seeding
-  save_period: 10
+  save_period: 50
   backup_period: 2000
 
 gt_depth_type: depth_raw_linear
@@ -22,6 +21,10 @@ gt_mask_type: valid_mask_raw
 
 max_epoch: 1  # a large enough number
 max_iter: 100  # usually converges at around 20k
+
+model:
+  name: MiDas
+  backbone: resnext101
 
 dataset:
   train:
@@ -57,10 +60,6 @@ dataset:
       resize_to_hw:
       - 160
       - 544
-
-model:
-  name: MiDas
-  backbone: densenet161
 
 depth_normalization:
   type: scale_shift_depth

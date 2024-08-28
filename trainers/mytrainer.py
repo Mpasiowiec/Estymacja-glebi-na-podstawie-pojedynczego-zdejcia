@@ -166,11 +166,18 @@ class NetTrainer:
                 
                 depth_pred: np.ndarray = model_pred.cpu().detach().numpy()
                 # Clip to dataset min max
-                depth_pred = np.clip(
-                    depth_pred,
-                    a_min=self.train_loader.dataset.min_depth,
-                    a_max=self.train_loader.dataset.max_depth,
-                )
+                if type(self.train_loader.dataset).__name__ == 'ConcatDataset':
+                  depth_pred = np.clip(
+                      depth_pred,
+                      a_min=self.train_loader.dataset.datasets[0].min_depth,
+                      a_max=self.train_loader.dataset.datasets[0].max_depth,
+                  )                
+                else:
+                  depth_pred = np.clip(
+                      depth_pred,
+                      a_min=self.train_loader.dataset.min_depth,
+                      a_max=self.train_loader.dataset.max_depth,
+                  )
                 # clip to d > 0 for evaluation
                 depth_pred = np.clip(depth_pred, a_min=1e-6, a_max=None)
                 # Evaluate
@@ -364,7 +371,7 @@ class NetTrainer:
 
     def save_checkpoint(self, ckpt_name, save_train_state):
         ckpt_dir = os.path.join(self.out_dir_ckpt, ckpt_name)
-        logging.info(f"Saving checkpoint to: {ckpt_dir}")
+        logging.debug(f"Saving checkpoint to: {ckpt_dir}")
         # Backup previous checkpoint
         temp_ckpt_dir = None
         if os.path.exists(ckpt_dir) and os.path.isdir(ckpt_dir):
@@ -381,7 +388,7 @@ class NetTrainer:
         # Save UNet
         net_path = os.path.join(ckpt_dir, 'net.pth')
         torch.save(self.model.state_dict(), net_path)
-        logging.info(f"Network weights are saved to: {net_path}")
+        logging.debug(f"Network weights are saved to: {net_path}")
 
         if save_train_state:
             state = {
@@ -401,7 +408,7 @@ class NetTrainer:
             f = open(os.path.join(ckpt_dir, self._get_backup_ckpt_name()), "w")
             f.close()
 
-            logging.info(f"Trainer state is saved to: {train_state_path}")        
+            logging.debug(f"Trainer state is saved to: {train_state_path}")        
 
         for metric_name in self.metric_monitor_tr.metrics:
                 self.model_temp_data.at[0, metric_name] = self.metric_monitor_tr.metrics[metric_name]["val"]
