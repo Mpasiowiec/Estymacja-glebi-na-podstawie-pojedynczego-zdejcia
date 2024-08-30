@@ -42,6 +42,8 @@ from torchvision.transforms import(
   functional
 )
 
+from util.alignment import depth2disparity
+
 from util.depth_transform import DepthNormalizerBase
 
 
@@ -75,6 +77,7 @@ class BaseDepthDataset(Dataset):
         resize_to_hw=None,
         move_invalid_to_far_plane: bool = True,
         rgb_transform=lambda x: x / 255.0 * 2 - 1,  #  [0, 255] -> [-1, 1],
+        gt_depth_type = 'depth_raw_linear',
         **kwargs,
     ) -> None:
         super().__init__()
@@ -91,6 +94,7 @@ class BaseDepthDataset(Dataset):
         self.name_mode: DepthFileNameMode = name_mode
         self.min_depth = min_depth
         self.max_depth = max_depth
+        self.gt_depth_type = gt_depth_type
 
         if self.norm_name == 'vkitti2':
             self.means, self.stds = [0.3849854,  0.38966277, 0.3119897], [0.3849854,  0.38966277, 0.3119897]
@@ -183,7 +187,10 @@ class BaseDepthDataset(Dataset):
         depth_raw = self._read_depth_file(depth_rel_path).squeeze()
         depth_raw_linear = torch.from_numpy(depth_raw).float().unsqueeze(0)  # [1, H, W]
         outputs["depth_raw_linear"] = depth_raw_linear.clone()
-
+        
+        disparity = depth2disparity(depth_raw_linear)
+        outputs["disparity"] = disparity.clone() 
+        
         # if self.has_filled_depth:
         #     depth_filled = self._read_depth_file(filled_rel_path).squeeze()
         #     depth_filled_linear = torch.from_numpy(depth_filled).float().unsqueeze(0)
@@ -232,17 +239,17 @@ class BaseDepthDataset(Dataset):
         return valid_mask
 
     def _training_preprocess(self, rasters):
+        
+        # Normalization
+        rasters["depth_raw_norm"] = self.depth_transform(
+            rasters["depth_raw_linear"], rasters["valid_mask_raw"]
+        ).clone()
+        
         # Augmentation
         if self.augm_args is not None:
             rasters = self._augment_data(rasters)
         else:
             rasters = {k: self.trans(v) if k == "rgb_img" else v for k, v in rasters.items()}
-
-
-        # Normalization
-        rasters["depth_raw_norm"] = self.depth_transform(
-            rasters["depth_raw_linear"], rasters["valid_mask_raw"]
-        ).clone()
 
         # Resize
         if self.resize_to_hw is not None:
@@ -283,10 +290,8 @@ class BaseDepthDataset(Dataset):
         # cutdepth:
         if self.augm_args.cutdepth.in_use :
             if random.random() < self.augm_args.cutdepth.p:
-              if self.augm_args.cutdepth.depth_type == 'linear':
-                temp_depth = rasters_dict['depth_raw_linear']
-              elif self.augm_args.cutdepth.depth_type == 'norm':
-                temp_depth = rasters_dict['depth_raw_norm']
+              if self.gt_depth_type in ['depth_raw_linear','depth_raw_norm','disparity']:
+                temp_depth = rasters_dict[self.gt_depth_type]
               else:
                 raise NotImplementedError
               temp_im = rasters_dict['rgb_img']

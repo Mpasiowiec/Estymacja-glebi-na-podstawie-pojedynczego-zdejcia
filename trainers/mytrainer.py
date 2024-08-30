@@ -26,7 +26,7 @@ from util.data_loader import skip_first_batches
 from util.logging_util import eval_dic_to_text
 from util.loss import get_loss
 from util.lr_scheduler import IterExponential
-from util.alignment import align_depth_least_square
+from util.alignment import align_depth_least_square, depth2disparity
 from util.seeding import generate_seed_sequence
 
 class NetTrainer:
@@ -140,8 +140,11 @@ class NetTrainer:
                 # Get data
                 rgb = batch["rgb_img"].to(device)
                 depth_gt = batch[self.gt_depth_type].to(device)
+                depth_raw = batch['depth_raw_linear'].to(device)
+                depth_raw_a = batch['depth_raw_linear'].numpy() # .squeeze()
 
                 if self.gt_mask_type is not None:
+                    valid_mask_raw = batch[self.gt_mask_type].numpy()
                     valid_mask = batch[self.gt_mask_type].to(device)
                 else:
                     raise NotImplementedError
@@ -155,7 +158,7 @@ class NetTrainer:
                 model_pred = self.model(rgb)
                 if torch.isnan(model_pred).any():
                     logging.warning("model_pred contains NaN.")
-
+                                    
                 # Masked loss
                 batch_loss = self.loss(
                       model_pred[valid_mask].float(),
@@ -165,6 +168,16 @@ class NetTrainer:
                 loss = batch_loss.mean()
                 
                 depth_pred: np.ndarray = model_pred.cpu().detach().numpy()
+                
+                if "least_square" == self.cfg.eval.alignment:
+                    depth_pred = align_depth_least_square(
+                        gt_arr=depth_raw_a,
+                        pred_arr=depth_pred,
+                        valid_mask_arr=valid_mask_raw,
+                        return_scale_shift=False,
+                        max_resolution=self.cfg.eval.align_max_res,
+                    )              
+                
                 # Clip to dataset min max
                 if type(self.train_loader.dataset).__name__ == 'ConcatDataset':
                   depth_pred = np.clip(
@@ -185,7 +198,7 @@ class NetTrainer:
                 depth_pred_ts = torch.from_numpy(depth_pred).to(self.device)
                 for met_func in self.metric_funcs:
                     _metric_name = met_func.__name__
-                    _metric = met_func(depth_pred_ts, depth_gt, valid_mask).item()
+                    _metric = met_func(depth_pred_ts, depth_raw, valid_mask).item()
                     sample_metric.append(_metric.__str__())
                     self.metric_monitor_tr.update(_metric_name, _metric, self.batch_size)                
                 
@@ -286,9 +299,11 @@ class NetTrainer:
             # Read input image
             rgb_int = batch["rgb_img"].to(self.device)  # .squeeze() [3, H, W]
             # GT depth
-            depth_ts = batch[self.gt_depth_type] # .squeeze()
-            depth_ts = depth_ts.to(self.device)
+            depth_gt = batch[self.gt_depth_type].to(self.device)      
+            depth_raw_a = batch['depth_raw_linear'].numpy()      
+            depth_raw = batch['depth_raw_linear'].to(self.device) # .squeeze()
             valid_mask_ts = batch[self.gt_mask_type] # .squeeze()
+            valid_mask = valid_mask_ts.numpy()
             valid_mask_ts = valid_mask_ts.to(self.device)
 
             # Random number generator
@@ -305,11 +320,20 @@ class NetTrainer:
             # Masked loss
             batch_loss = self.loss(
                   model_pred[valid_mask_ts].float(),
-                  depth_ts[valid_mask_ts].float(),
+                  depth_gt[valid_mask_ts].float(),
               )
             loss = batch_loss.mean()
 
             depth_pred: np.ndarray = model_pred.detach().cpu().numpy()
+
+            if "least_square" == self.cfg.eval.alignment:
+                depth_pred = align_depth_least_square(
+                    gt_arr=depth_raw_a,
+                    pred_arr=depth_pred,
+                    valid_mask_arr=valid_mask,
+                    return_scale_shift=False,
+                    max_resolution=self.cfg.eval.align_max_res,
+                )
 
             # Clip to dataset min max
             depth_pred = np.clip(
@@ -327,7 +351,7 @@ class NetTrainer:
 
             for met_func in self.metric_funcs:
                 _metric_name = met_func.__name__
-                _metric = met_func(depth_pred_ts, depth_ts, valid_mask_ts).item()
+                _metric = met_func(depth_pred_ts, depth_raw, valid_mask_ts).item()
                 sample_metric.append(_metric.__str__())
                 self.metric_monitor_vl.update(_metric_name, _metric, rgb_int.shape[0])
             self.metric_monitor_vl.update("loss", loss.item(), rgb_int.shape[0])       

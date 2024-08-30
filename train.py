@@ -112,8 +112,6 @@ if "__main__" == __name__:
             out_dir_run = os.path.join("./output", job_name)
         os.makedirs(out_dir_run, exist_ok=False)
 
-    cfg_data = cfg.dataset
-
     # Other directories
     out_dir_ckpt = os.path.join(out_dir_run, "checkpoint")
     if not os.path.exists(out_dir_ckpt):
@@ -161,16 +159,17 @@ if "__main__" == __name__:
         cfg_normalizer=cfg.depth_normalization
     )
     train_dataset: BaseDepthDataset = get_dataset(
-        cfg_data.train,
+        cfg.dataset.train,
         base_data_dir=base_data_dir,
         mode=DatasetMode.TRAIN,
         augmentation_args=cfg.augmentation_args,
         depth_transform=depth_transform,
+        gt_depth_type=cfg.gt_depth_type
     )
     logging.debug("Augmentation: ", cfg.augmentation_args)
-    if "mixed" == cfg_data.train.name:
+    if "mixed" == cfg.dataset.train.name:
         dataset_ls = train_dataset
-        assert len(cfg_data.train.prob_ls) == len(
+        assert len(cfg.dataset.train.prob_ls) == len(
             dataset_ls
         ), "Lengths don't match: `prob_ls` and `dataset_list`"
         concat_dataset = ConcatDataset(dataset_ls)
@@ -178,7 +177,7 @@ if "__main__" == __name__:
             src_dataset_ls=dataset_ls,
             batch_size=cfg.dataloader.train_batch_size,
             drop_last=True,
-            prob=cfg_data.train.prob_ls,
+            prob=cfg.dataset.train.prob_ls,
             shuffle=True,
             generator=loader_generator,
         )
@@ -199,14 +198,15 @@ if "__main__" == __name__:
         )
     # Validation dataset
     val_dataset: BaseDepthDataset = get_dataset(
-        cfg_data.val,
+        cfg.dataset.val,
         base_data_dir=base_data_dir,
         mode=DatasetMode.TRAIN,
         depth_transform=depth_transform,
+        gt_depth_type=cfg.gt_depth_type
     )
-    if "mixed" == cfg_data.val.name:
+    if "mixed" == cfg.dataset.val.name:
         dataset_ls = val_dataset
-        assert len(cfg_data.val.prob_ls) == len(
+        assert len(cfg.dataset.val.prob_ls) == len(
             dataset_ls
         ), "Lengths don't match: `prob_ls` and `dataset_list`"
         concat_dataset = ConcatDataset(dataset_ls)
@@ -214,7 +214,7 @@ if "__main__" == __name__:
             src_dataset_ls=dataset_ls,
             batch_size=cfg.dataloader.val_batch_size,
             drop_last=True,
-            prob=cfg_data.val.prob_ls,
+            prob=cfg.dataset.val.prob_ls,
             shuffle=False,
             generator=loader_generator,
         )
@@ -235,12 +235,13 @@ if "__main__" == __name__:
         )
     # Test dataset
     test_loaders: List[DataLoader] = []
-    for _test_dic in cfg_data.test:
+    for _test_dic in cfg.dataset.test:
         _test_dataset = get_dataset(
             _test_dic,
             base_data_dir=base_data_dir,
             mode=DatasetMode.TRAIN,
             depth_transform=depth_transform,
+            gt_depth_type=cfg.gt_depth_type
         )
         _test_loader = DataLoader(
             dataset=_test_dataset,

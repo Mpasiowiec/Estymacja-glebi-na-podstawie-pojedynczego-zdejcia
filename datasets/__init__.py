@@ -38,12 +38,13 @@ dataset_name_class_dict = {
 
 
 def get_dataset(
-    cfg_data_split, base_data_dir: str, mode: DatasetMode, **kwargs
+    cfg_data_split, base_data_dir: str, mode: DatasetMode,
+        gt_depth_type, **kwargs
 ) -> BaseDepthDataset:
     if "mixed" == cfg_data_split.name:
         assert DatasetMode.TRAIN == mode, "Only training mode supports mixed datasets."
         dataset_ls = [
-            get_dataset(_cfg, base_data_dir, mode, **kwargs)
+            get_dataset(_cfg, base_data_dir, mode, gt_depth_type, **kwargs)
             for _cfg in cfg_data_split.dataset_list
         ]
         return dataset_ls
@@ -53,6 +54,7 @@ def get_dataset(
             mode=mode,
             filename_ls_path=cfg_data_split.filenames,
             dataset_dir=os.path.join(base_data_dir, cfg_data_split.dir),
+            gt_depth_type = gt_depth_type,
             **cfg_data_split,
             **kwargs,
         )
