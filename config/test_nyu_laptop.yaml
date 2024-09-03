@@ -22,8 +22,8 @@ max_epoch: 15  # a large enough number
 max_iter: 10000  # usually converges at around 20k
 
 model:
-  name: MiDas
-  backbone: resnet101
+  name: TernausNet
+  backbone: vgg116
 
 dataset:
   train:
@@ -84,7 +84,7 @@ augmentation_args:
     p: 0.25
 
 optimizer:
-  name: AdamW
+  name: SGD
 
 loss:
   name: mse_loss
