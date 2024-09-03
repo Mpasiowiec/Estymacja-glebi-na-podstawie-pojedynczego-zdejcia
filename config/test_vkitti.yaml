@@ -12,14 +12,14 @@ dataloader:
 # Training settings
 trainer:
   init_seed: 2024  # use null to train w/o seeding
-  save_period: 50
+  save_period: 100
   backup_period: 2000
 
-gt_depth_type: depth_raw_linear
+gt_depth_type: depth_raw_norm
 gt_mask_type: valid_mask_raw
 
-max_epoch: 1  # a large enough number
-max_iter: 100  # usually converges at around 20k
+max_epoch: 3  # a large enough number
+max_iter: 10000  # usually converges at around 20k
 
 model:
   name: MiDas
@@ -63,9 +63,9 @@ dataset:
 depth_normalization:
   type: scale_shift_depth
   clip: true
-  norm_min: 0.000001
+  norm_min: -1.0
   norm_max: 1.0
-  min_max_quantile: 0.01
+  min_max_quantile: 0.02
 
 augmentation_args:
   random_horizontal_flip:
@@ -88,14 +88,15 @@ augmentation_args:
     p: 0.25
 
 optimizer:
-  name: AdamW
+  name: SGD
 
 loss:
   name: mse_loss
   kwargs:
     reduction: mean
 
-lr: 3.0e-05
+lr_pretrained: 3.0e-05
+lr_scratch: 3.0e-03
 
 lr_scheduler:
   name: IterExponential

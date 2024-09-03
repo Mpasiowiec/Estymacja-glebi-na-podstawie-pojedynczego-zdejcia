@@ -58,11 +58,20 @@ class NetTrainer:
         lr = self.cfg.lr
         
         if self.cfg.optimizer.name == 'Adam':
-            self.optimizer = Adam(self.model.parameters(), lr=lr)
+            self.optimizer = Adam([
+              {'params' : self.model.pretrained.parameters(), 'lr' : self.cfg.lr_pretrained},
+              {'params' : self.model.scratch.parameters(), 'lr' : self.cfg.lr_scratch},
+              ])
         elif self.cfg.optimizer.name == 'AdamW':
-            self.optimizer = AdamW(self.model.parameters(), lr=lr)
+            self.optimizer = AdamW([
+              {'params' : self.model.pretrained.parameters(), 'lr' : self.cfg.lr_pretrained},
+              {'params' : self.model.scratch.parameters(), 'lr' : self.cfg.lr_scratch},
+              ])
         elif self.cfg.optimizer.name == 'SGD':
-            self.optimizer = SGD(self.model.parameters(), lr=lr)
+            self.optimizer = SGD([
+              {'params' : self.model.pretrained.parameters(), 'lr' : self.cfg.lr_pretrained},
+              {'params' : self.model.scratch.parameters(), 'lr' : self.cfg.lr_scratch},
+              ])
 
         # LR scheduler
         lr_func = IterExponential(
@@ -140,8 +149,8 @@ class NetTrainer:
                 # Get data
                 rgb = batch["rgb_img"].to(device)
                 depth_gt = batch[self.gt_depth_type].to(device)
-                depth_raw = batch['depth_raw_linear'].to(device)
-                depth_raw_a = batch['depth_raw_linear'].numpy() # .squeeze()
+                depth_raw = batch['depth_raw_linear'].numpy()
+                depth_raw_met = batch['depth_raw_linear'].to(device)
 
                 if self.gt_mask_type is not None:
                     valid_mask_raw = batch[self.gt_mask_type].numpy()
@@ -167,11 +176,11 @@ class NetTrainer:
 
                 loss = batch_loss.mean()
                 
-                depth_pred: np.ndarray = model_pred.cpu().detach().numpy()
+                depth_pred: np.ndarray = model_pred.detach().cpu().numpy()
                 
                 if "least_square" == self.cfg.eval.alignment:
                     depth_pred = align_depth_least_square(
-                        gt_arr=depth_raw_a,
+                        gt_arr=depth_raw,
                         pred_arr=depth_pred,
                         valid_mask_arr=valid_mask_raw,
                         return_scale_shift=False,
@@ -198,7 +207,7 @@ class NetTrainer:
                 depth_pred_ts = torch.from_numpy(depth_pred).to(self.device)
                 for met_func in self.metric_funcs:
                     _metric_name = met_func.__name__
-                    _metric = met_func(depth_pred_ts, depth_raw, valid_mask).item()
+                    _metric = met_func(depth_pred_ts, depth_raw_met, valid_mask).item()
                     sample_metric.append(_metric.__str__())
                     self.metric_monitor_tr.update(_metric_name, _metric, self.batch_size)                
                 
@@ -303,7 +312,7 @@ class NetTrainer:
             depth_raw_a = batch['depth_raw_linear'].numpy()      
             depth_raw = batch['depth_raw_linear'].to(self.device) # .squeeze()
             valid_mask_ts = batch[self.gt_mask_type] # .squeeze()
-            valid_mask = valid_mask_ts.numpy()
+            valid_mask_a = valid_mask_ts.numpy()
             valid_mask_ts = valid_mask_ts.to(self.device)
 
             # Random number generator
@@ -330,7 +339,7 @@ class NetTrainer:
                 depth_pred = align_depth_least_square(
                     gt_arr=depth_raw_a,
                     pred_arr=depth_pred,
-                    valid_mask_arr=valid_mask,
+                    valid_mask_arr=valid_mask_a,
                     return_scale_shift=False,
                     max_resolution=self.cfg.eval.align_max_res,
                 )

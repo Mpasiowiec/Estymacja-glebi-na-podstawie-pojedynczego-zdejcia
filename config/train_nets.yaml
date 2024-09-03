@@ -37,7 +37,7 @@ dataset:
       - 544
 
 model:
-  name: MiDas
+  name: TernausNet
   backbone: densenet161
 
 depth_normalization:

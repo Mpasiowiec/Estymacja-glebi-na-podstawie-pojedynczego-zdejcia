@@ -111,6 +111,8 @@ validation:
   init_seed: 2024
 
 eval:
+  alignment: least_square
+  align_max_res: null
   eval_metrics:
   - abs_relative_difference
   - squared_relative_difference
