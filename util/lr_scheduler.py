@@ -20,7 +20,7 @@ class IterExponential:
 
     def __call__(self, n_iter) -> float:
         if n_iter < self.warmup_steps:
-            alpha = 1.0 * n_iter / self.warmup_steps
+            alpha = 1.0 # * n_iter / self.warmup_steps
         elif n_iter >= self.total_length:
             alpha = self.final_ratio
         else:
@@ -36,7 +36,7 @@ if "__main__" == __name__:
         total_iter_length=50000, final_ratio=0.01, warmup_steps=200
     )
     lr_scheduler = IterExponential(
-        total_iter_length=50000, final_ratio=0.01, warmup_steps=0
+        total_iter_length=50000, final_ratio=0.2, warmup_steps=0
     )
 
     x = np.arange(100000)

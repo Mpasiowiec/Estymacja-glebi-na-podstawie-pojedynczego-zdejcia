@@ -102,8 +102,8 @@ lr_scheduler:
   name: IterExponential
   kwargs:
     total_iter: 25000
-    final_ratio: 0.01
-    warmup_steps: 100
+    final_ratio: 3.0e-010
+    warmup_steps: 1000
 
 # Validation settings
 validation:

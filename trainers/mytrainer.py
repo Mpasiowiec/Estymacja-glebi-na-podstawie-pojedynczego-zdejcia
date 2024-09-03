@@ -54,9 +54,7 @@ class NetTrainer:
         self.train_loader: DataLoader = train_dataloader
         self.val_loader: DataLoader = val_dataloader
 
-        # Optimizer !should be defined after input layer is adapted
-        lr = self.cfg.lr
-        
+        # Optimizer !should be defined after input layer is adapted      
         if self.cfg.optimizer.name == 'Adam':
             self.optimizer = Adam([
               {'params' : self.model.pretrained.parameters(), 'lr' : self.cfg.lr_pretrained},
