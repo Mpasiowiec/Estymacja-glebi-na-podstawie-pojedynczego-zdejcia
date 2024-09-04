@@ -80,7 +80,7 @@ class NetTrainer:
         self.lr_scheduler = LambdaLR(optimizer=self.optimizer, lr_lambda=lr_func)
 
         # Loss
-        self.loss = get_loss(loss_name=self.cfg.loss.name, **self.cfg.loss.kwargs)
+        self.loss = get_loss(loss_name=self.cfg.loss.name)
 
         # Eval metrics
         self.metric_funcs = [getattr(metric, _met) for _met in cfg.eval.eval_metrics]
@@ -168,8 +168,9 @@ class NetTrainer:
                                     
                 # Masked loss
                 batch_loss = self.loss(
-                      model_pred[valid_mask].float(),
-                      depth_gt[valid_mask].float(),
+                      model_pred.float(),
+                      depth_gt.float(),
+                      valid_mask
                   )
 
                 loss = batch_loss.mean()
@@ -326,8 +327,9 @@ class NetTrainer:
 
             # Masked loss
             batch_loss = self.loss(
-                  model_pred[valid_mask_ts].float(),
-                  depth_gt[valid_mask_ts].float(),
+                  model_pred.float(),
+                  depth_gt.float(),
+                  valid_mask_ts
               )
             loss = batch_loss.mean()
 

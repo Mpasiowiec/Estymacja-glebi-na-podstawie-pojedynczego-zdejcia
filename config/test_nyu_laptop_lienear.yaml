@@ -15,10 +15,10 @@ trainer:
   save_period: 50
   backup_period: 2000
 
-gt_depth_type: depth_raw_norm
+gt_depth_type: depth_raw_linear
 gt_mask_type: valid_mask_raw
 
-max_epoch: 15  # a large enough number
+max_epoch: 10  # a large enough number
 max_iter: 10000  # usually converges at around 20k
 
 model:
@@ -87,18 +87,17 @@ optimizer:
   name: SGD
 
 loss:
-  name: mse_loss
-  kwargs:
-    reduction: mean
+  name: l1_loss_with_mask
 
-lr: 3.0e-05
+lr_pretrained: 3.0e-05
+lr_scratch: 3.0e-03
 
 lr_scheduler:
   name: IterExponential
   kwargs:
     total_iter: 25000
-    final_ratio: 0.01
-    warmup_steps: 100
+    final_ratio: 3.0e-06
+    warmup_steps: 1000
 
 # Validation settings
 validation:

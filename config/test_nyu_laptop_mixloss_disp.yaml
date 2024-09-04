@@ -22,8 +22,8 @@ max_epoch: 10  # a large enough number
 max_iter: 10000  # usually converges at around 20k
 
 model:
-  name: MiDas
-  backbone: resnet101
+  name: TernausNet
+  backbone: vgg116
 
 dataset:
   train:
@@ -84,21 +84,22 @@ augmentation_args:
     p: 0.25
 
 optimizer:
-  name: AdamW
+  name: SGD
 
 loss:
-  name: ssitrim_reg
+  name: mixed
   kwargs:
     reduction: mean
 
-lr: 3.0e-05
+lr_pretrained: 3.0e-05
+lr_scratch: 3.0e-03
 
 lr_scheduler:
   name: IterExponential
   kwargs:
-    total_iter: 25000
-    final_ratio: 0.01
-    warmup_steps: 100
+    total_iter: 1400
+    final_ratio: 3.0e-06
+    warmup_steps: 280
 
 # Validation settings
 validation:
@@ -108,6 +109,7 @@ validation:
 
 eval:
   alignment: least_square
+  align_max_res: null
   eval_metrics:
   - abs_relative_difference
   - squared_relative_difference

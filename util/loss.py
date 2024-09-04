@@ -17,7 +17,19 @@ def get_loss(loss_name, **kwargs):
     elif "l1_loss_with_mask" == loss_name:
         criterion = L1LossWithMask(**kwargs)
     elif "mean_abs_rel" == loss_name:
-        criterion = MeanAbsRelLoss()
+        criterion = MeanAbsRelLoss(**kwargs)
+    elif "ge_loss" == loss_name:
+        criterion = GELoss(**kwargs)
+    elif "ssim_loss" == loss_name:
+        criterion = SSIMLoss(**kwargs)
+    elif "mixed" == loss_name:
+        criterion = mixLoss(**kwargs)
+        
+        
+        
+        
+        
+        
     elif "ssitrim" == loss_name:
         criterion = SSITrim()
     elif "reg" == loss_name:
@@ -129,6 +141,88 @@ class SILogRMSELoss:
         second_term = self.lamb * torch.pow(torch.sum(diff, (-1, -2)), 2) / (n**2)
         loss = torch.sqrt(first_term - second_term).mean() * self.alpha
         return loss
+
+
+
+class GELoss():
+    def __init__(self, batch_reduction=False):
+        self.batch_reduction = batch_reduction
+    
+    def __call__(self, depth_pred, depth_gt, valid_mask):
+        d_diff = depth_pred - depth_gt
+        d_diff = torch.mul(d_diff, valid_mask)
+        v_gradient = torch.abs(d_diff[:,:,0:-2, :] - d_diff[:,:,2:, :])
+        v_mask = torch.mul(valid_mask[:,:,0:-2, :], valid_mask[:,:,2:, :])
+        v_gradient = torch.mul(v_gradient, v_mask)
+        h_gradient = torch.abs(d_diff[:,:,:, 0:-2] - d_diff[:,:,:, 2:])
+        h_mask = torch.mul(valid_mask[:,:,:, 0:-2], valid_mask[:,:,:, 2:])
+        h_gradient = torch.mul(h_gradient, h_mask)
+        gradient_loss = h_gradient.sum() + v_gradient.sum()
+        valid_num = torch.sum(h_mask) + torch.sum(v_mask)
+        gradient_loss = gradient_loss / (valid_num + 1e-8)
+        if self.batch_reduction:
+            gradient_loss = gradient_loss.mean()
+        return gradient_loss
+
+class SSIMLoss:
+    def __init__(self, batch_reduction=False):
+        self.batch_reduction = batch_reduction
+
+    def __call__(self, depth_pred, depth_gt, valid_mask=None):
+        (std_pred, mean_pred) = torch.std_mean(depth_pred,dim=(-1,-2))
+        (std_gt, mean_gt) = torch.std_mean(depth_gt,dim=(-1,-2))
+        
+        
+        loss = (2*mean_pred*mean_gt + 1.0e-06)*(2*std_pred*std_gt + 1.0e-06)/((mean_pred*mean_pred + mean_gt*mean_gt + 1.0e-06)*(std_pred*std_pred + std_gt*std_gt + 1.0e-06))
+        if self.batch_reduction:
+            loss = loss.mean()
+        return loss
+
+class mixLoss:
+    def __init__(self, batch_reduction=False, reduction='mean'):
+        self.batch_reduction = batch_reduction
+        self.reduction = reduction
+
+
+    def __call__(self, depth_pred, depth_gt, valid_mask=None):
+        diff = depth_pred - depth_gt
+        if valid_mask is not None:
+            diff[~valid_mask] = 0
+            n = valid_mask.sum((-1, -2))
+        else:
+            n = depth_gt.shape[-2] * depth_gt.shape[-1]
+        loss_mae = torch.sum(torch.abs(diff)) / n
+        if self.batch_reduction:
+            loss_mae = loss_mae.mean()
+        
+        
+        
+        d_diff = depth_pred - depth_gt
+        d_diff = torch.mul(d_diff, valid_mask)
+        v_gradient = torch.abs(d_diff[:,:,0:-2, :] - d_diff[:,:,2:, :])
+        v_mask = torch.mul(valid_mask[:,:,0:-2, :], valid_mask[:,:,2:, :])
+        v_gradient = torch.mul(v_gradient, v_mask)
+        h_gradient = torch.abs(d_diff[:,:,:, 0:-2] - d_diff[:,:,:, 2:])
+        h_mask = torch.mul(valid_mask[:,:,:, 0:-2], valid_mask[:,:,:, 2:])
+        h_gradient = torch.mul(h_gradient, h_mask)
+        gradient_loss = h_gradient.sum() + v_gradient.sum()
+        valid_num = torch.sum(h_mask) + torch.sum(v_mask)
+        gradient_loss = gradient_loss / (valid_num + 1e-8)
+        if self.batch_reduction:
+            gradient_loss = gradient_loss.mean()
+        
+        (std_pred, mean_pred) = torch.std_mean(depth_pred,dim=(-1,-2))
+        (std_gt, mean_gt) = torch.std_mean(depth_gt,dim=(-1,-2))
+        
+        
+        loss = (2*mean_pred*mean_gt + 1.0e-06)*(2*std_pred*std_gt + 1.0e-06)/((mean_pred*mean_pred + mean_gt*mean_gt + 1.0e-06)*(std_pred*std_pred + std_gt*std_gt + 1.0e-06))
+        if self.batch_reduction:
+            loss = loss.mean()
+            
+        return 0.6 * loss_mae + 0.2 * gradient_loss + loss
+
+
+
     
 class SSITrim():
     def __init__(self, cutoff=0.2):
@@ -149,8 +243,7 @@ class SSITrim():
         loss = (img_loss / 2).mean()
         return loss
         
-        
-           
+              
 class REG():
     def __init__(self, scale_lv=4):
         self.scale_lv=scale_lv
@@ -181,7 +274,6 @@ class REG():
             grad_term += self.single_scale_grad_loss(prediction_d_a, gt_d, mask)
 
         return grad_term
-
 
     
 class ssitrim_reg():
