@@ -15,10 +15,10 @@ trainer:
   save_period: 100
   backup_period: 2000
 
-gt_depth_type: depth_raw_norm
+gt_depth_type: depth_raw_linear
 gt_mask_type: valid_mask_raw
 
-max_epoch: 3  # a large enough number
+max_epoch: 5  # a large enough number
 max_iter: 10000  # usually converges at around 20k
 
 model:
@@ -88,22 +88,20 @@ augmentation_args:
     p: 0.25
 
 optimizer:
-  name: SGD
+  name: AdamW
 
 loss:
-  name: mse_loss
-  kwargs:
-    reduction: mean
+  name: mixed
 
 lr_pretrained: 3.0e-05
 lr_scratch: 3.0e-03
 
-lr_scheduler:
-  name: IterExponential
-  kwargs:
-    total_iter: 25000
-    final_ratio: 3.0e-010
-    warmup_steps: 1000
+# lr_scheduler:
+#   name: IterExponential
+#   kwargs:
+#     total_iter: 25000
+#     final_ratio: 3.0e-010
+#     warmup_steps: 1000
 
 # Validation settings
 validation:

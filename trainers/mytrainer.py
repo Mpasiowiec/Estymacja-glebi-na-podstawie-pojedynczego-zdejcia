@@ -13,7 +13,7 @@ from omegaconf import OmegaConf
 from torch.nn import Conv2d
 from torch.nn.parameter import Parameter
 from torch.optim import Adam, AdamW, SGD
-from torch.optim.lr_scheduler import LambdaLR
+from torch.optim.lr_scheduler import LambdaLR, ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from PIL import Image
@@ -72,12 +72,12 @@ class NetTrainer:
               ])
 
         # LR scheduler
-        lr_func = IterExponential(
-            total_iter_length=self.cfg.lr_scheduler.kwargs.total_iter,
-            final_ratio=self.cfg.lr_scheduler.kwargs.final_ratio,
-            warmup_steps=self.cfg.lr_scheduler.kwargs.warmup_steps,
-        )
-        self.lr_scheduler = LambdaLR(optimizer=self.optimizer, lr_lambda=lr_func)
+        # lr_func = IterExponential(
+        #     total_iter_length=self.cfg.lr_scheduler.kwargs.total_iter,
+        #     final_ratio=self.cfg.lr_scheduler.kwargs.final_ratio,
+        #     warmup_steps=self.cfg.lr_scheduler.kwargs.warmup_steps,
+        # )
+        self.lr_scheduler = ReduceLROnPlateau(optimizer=self.optimizer, factor=0.25, patience=50)
 
         # Loss
         self.loss = get_loss(loss_name=self.cfg.loss.name)
@@ -218,7 +218,6 @@ class NetTrainer:
 
                 # Perform optimization step
                 self.optimizer.step()
-                self.lr_scheduler.step()
 
                 self.effective_iter += 1
 
@@ -231,7 +230,7 @@ class NetTrainer:
                     f"train/{k['avg']}: {v['avg']}" for k, v in self.metric_monitor_tr.metrics
                 )
                 logging.debug(
-                    f"lr {self.lr_scheduler.get_last_lr()[0]}, n_batch_in_epoch {self.n_batch_in_epoch}"
+                    f"lr {self.lr_scheduler.get_last_lr()}, n_batch_in_epoch {self.n_batch_in_epoch}"
                 )
 
                 # Per-step callback
@@ -268,6 +267,7 @@ class NetTrainer:
             self.save_checkpoint(ckpt_name="latest", save_train_state=True)
 
             # Epoch end
+            self.lr_scheduler.step(accumulated_loss)
             self.n_batch_in_epoch = 0
             
         time_elapsed = (datetime.now() - train_start).total_seconds()      
