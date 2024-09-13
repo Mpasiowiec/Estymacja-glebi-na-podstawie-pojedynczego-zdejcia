@@ -13,13 +13,11 @@ dataloader:
 trainer:
   init_seed: 2024  # use null to train w/o seeding
   save_period: 50
-  backup_period: 2000
 
-gt_depth_type: disparity
+gt_depth_type: depth_raw_norm
 gt_mask_type: valid_mask_raw
 
-max_epoch: 10  # a large enough number
-max_iter: 10000  # usually converges at around 20k
+epochs_num: 10  # a large enough number
 
 model:
   name: TernausNet
@@ -87,22 +85,22 @@ optimizer:
   name: SGD
 
 loss:
-  name: l1_loss_with_mask
+  name: mse_loss_with_mask
+  kwargs:
+    reduction: mean
 
 lr_pretrained: 3.0e-05
 lr_scratch: 3.0e-03
 
 lr_scheduler:
-  name: IterExponential
-  kwargs:
-    total_iter: 25000
-    final_ratio: 3.0e-06
-    warmup_steps: 1000
+  factor: 0.2
+  patience: 400
+  min_lr: 3.0e-07
 
 # Validation settings
 validation:
   main_val_metric: abs_relative_difference
-  main_val_metric_goal: minimize
+  main_val_metric_goal: min
   init_seed: 2024
 
 eval:

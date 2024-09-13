@@ -15,7 +15,7 @@ from models.TernausNet import UNet16
 
 from datasets import BaseDepthDataset, DatasetMode, get_dataset
 from datasets.mixed_sampler import MixedBatchSampler
-from trainers.mytrainer import NetTrainer
+from trainers.old_trainer import NetTrainer
 from util.config_util import (
     find_value_in_omegaconf,
     recursive_load_config,
@@ -113,15 +113,13 @@ if "__main__" == __name__:
         os.makedirs(out_dir_run, exist_ok=False)
 
     # Other directories
-    out_dir_ckpt = os.path.join(out_dir_run, "checkpoint")
-    if not os.path.exists(out_dir_ckpt):
-        os.makedirs(out_dir_ckpt)
-    out_dir_tr = os.path.join(out_dir_run, "training_record")
-    if not os.path.exists(out_dir_tr):
-        os.makedirs(out_dir_tr)
-    out_dir_eval = os.path.join(out_dir_run, "evaluation_record")
-    if not os.path.exists(out_dir_eval):
-        os.makedirs(out_dir_eval)
+    out_dir_dic = {
+        'ckpt'  : os.path.join(out_dir_run, "checkpoint"),
+        'rec' : os.path.join(out_dir_run, "records"),
+    }
+    for key in out_dir_dic.keys():
+        if not os.path.exists(out_dir_dic[key]):
+            os.makedirs(out_dir_dic[key])
 
     # -------------------- Logging settings --------------------
     config_logging(cfg.logging, out_dir=out_dir_run)
@@ -166,7 +164,7 @@ if "__main__" == __name__:
         depth_transform=depth_transform,
         gt_depth_type=cfg.gt_depth_type
     )
-    logging.debug("Augmentation: ", cfg.augmentation_args)
+    
     if "mixed" == cfg.dataset.train.name:
         dataset_ls = train_dataset
         assert len(cfg.dataset.train.prob_ls) == len(
@@ -252,6 +250,12 @@ if "__main__" == __name__:
         )
         test_loaders.append(_test_loader)
 
+    dataloaders = {
+    'train' : train_loader,
+    'val' : val_loader,
+    'tests' : test_loaders,
+    }
+    
     # -------------------- Model --------------------
     if cfg.model.name == 'TernausNet':
         model = UNet16(pretrained=True, is_deconv=True)
@@ -272,13 +276,9 @@ if "__main__" == __name__:
     trainer = NetTrainer(
         cfg=cfg,
         model=model,
-        train_dataloader=train_loader,
+        dataloaders=dataloaders,
         device=device,
-        out_dir_ckpt=out_dir_ckpt,
-        out_dir_tr=out_dir_tr,
-        out_dir_eval=out_dir_eval,
-        val_dataloader=val_loader,
-        test_dataloaders=test_loaders,
+        out_dir_dic=out_dir_dic,
     )
 
     # -------------------- Checkpoint --------------------
@@ -289,6 +289,6 @@ if "__main__" == __name__:
 
     # -------------------- Training & Evaluation Loop --------------------
     try:
-        trainer.train(t_end=t_end)
+        trainer.train_and_validate(t_end=t_end)
     except Exception as e:
         logging.exception(e)
