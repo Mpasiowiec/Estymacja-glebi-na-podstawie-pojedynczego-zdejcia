@@ -210,23 +210,31 @@ class NetTrainer:
                                 logging.debug(
                                     f"lr {self.lr_scheduler.get_last_lr()}, n_batch_in_epoch ({self.n_batch_in_epoch}/{len(self.dataloaders[phase])})"
                                     )                            
-                            
+                    
+                    _is_latest_saved = False        
                     if (
                         self.save_period > 0
                         and 0 == self.effective_iter % self.save_period
+                        and not _is_latest_saved
                     ):
                         self.save_checkpoint(ckpt_name="latest", save_train_state=True)
+                        _is_latest_saved = True
                             
                     if t_end is not None and datetime.now() >= t_end:
-                        self.save_checkpoint(ckpt_name="latest", save_train_state=True)
+                        if not _is_latest_saved:
+                            self.save_checkpoint(ckpt_name="latest", save_train_state=True)
                         time_elapsed = (datetime.now() - train_start).total_seconds()
                         logging.info(f'Time is up, training paused. Training time: {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
                         return
                     
-                    self.in_evaluation = True if phase == 'train' else False
-                    
                     torch.cuda.empty_cache()
-                
+                    
+                if phase == 'train':
+                    self.in_evaluation = True
+                else: 
+                    self.in_evaluation = False
+                    
+                    
                 for metric_name in self.metric_monitors[phase].metrics:
                     self.model_datas[phase].at[self.epoch-1, metric_name] = self.metric_monitors[phase].metrics[metric_name]["avg"]
                 self.model_datas[phase].to_csv(os.path.join(self.out_dir_dic['rec'], phase+'_record.csv'), index=False)
@@ -244,6 +252,8 @@ class NetTrainer:
                     ):
                     self.best_metric = epoch_main_metric
                     self.best_model = copy.deepcopy(self.model.state_dict())
+                
+                self.save_checkpoint(ckpt_name="latest", save_train_state=True)               
                 
             self.n_batch_in_epoch = 0
             
@@ -265,7 +275,7 @@ class NetTrainer:
 
     def save_checkpoint(self, ckpt_name, save_train_state):
         ckpt_dir = os.path.join(self.out_dir_dic['ckpt'], ckpt_name)
-        logging.debug(f"Saving checkpoint to: {ckpt_dir}")
+        logging.debug(f"at iteration {self.effective_iter} Saving checkpoint to: {ckpt_dir}")
         # Backup previous checkpoint
         temp_ckpt_dir = None
         if os.path.exists(ckpt_dir) and os.path.isdir(ckpt_dir):
