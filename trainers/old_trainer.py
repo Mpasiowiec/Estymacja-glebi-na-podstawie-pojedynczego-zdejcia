@@ -349,7 +349,9 @@ class NetTrainer:
                 logging.info(f"LR scheduler state is loaded from {ckpt_path}")
 
         self.metric_monitors['train'].load(os.path.join(self.out_dir_dic['rec'],'temp_record.csv'))
-        self.model_datas['train'] = pd.read_csv(os.path.join(self.out_dir_dic['rec'],'train_record.csv'))
+        
+        if os.path.exists(os.path.join(self.out_dir_dic['rec'],'train_record.csv')):
+          self.model_datas['train'] = pd.read_csv(os.path.join(self.out_dir_dic['rec'],'train_record.csv'))
         if os.path.exists(os.path.join(self.out_dir_dic['rec'],'eval_record.csv')):
             self.model_datas['val'] = pd.read_csv(os.path.join(self.out_dir_dic['rec'],'eval_record.csv'))
         logging.info(
