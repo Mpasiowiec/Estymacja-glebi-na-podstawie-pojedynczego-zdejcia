@@ -265,7 +265,7 @@ class mixLoss:
         if self.batch_reduction:
             loss = loss.mean()
             
-        return 0.6 * loss_mae + 0.2 * grad_loss + loss
+        return 0.6 * loss_mae + grad_loss + loss
 
 
 

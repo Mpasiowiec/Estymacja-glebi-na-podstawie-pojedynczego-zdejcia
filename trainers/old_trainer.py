@@ -121,7 +121,7 @@ class NetTrainer:
             
         for epoch in range(self.epoch, self.epochs_num + 1):
             self.epoch = epoch
-            logging.debug(f'Epoch [{self.epoch}/{self.epochs_num}]')
+            logging.info(f'Epoch [{self.epoch}/{self.epochs_num}]')
             
             for phase in ['train', 'val']:
                 if self.in_evaluation and phase=='train':
@@ -200,7 +200,6 @@ class NetTrainer:
                         if phase == 'train':
                             loss.backward()
                             self.optimizer.step()
-                            self.lr_scheduler.step(self.metric_monitors[phase].metrics[self.main_val_metric]['avg'])
                             self.n_batch_in_epoch += 1
                             self.effective_iter += 1
                             if self.effective_iter%10 == 0:
@@ -231,9 +230,9 @@ class NetTrainer:
                     
                 if phase == 'train':
                     self.in_evaluation = True
-                else: 
+                else:
+                    self.lr_scheduler.step(self.metric_monitors[phase].metrics['loss']['avg']) 
                     self.in_evaluation = False
-                    
                     
                 for metric_name in self.metric_monitors[phase].metrics:
                     self.model_datas[phase].at[self.epoch-1, metric_name] = self.metric_monitors[phase].metrics[metric_name]["avg"]

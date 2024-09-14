@@ -6,7 +6,7 @@ dataloader:
   pin_memory: true
   train_batch_size: 20
   val_batch_size: 20
-  test_batch_size: 48
+  test_batch_size: 2
   seed: 2024  # to ensure continuity when resuming from checkpoint
 
 # Training settings
@@ -57,6 +57,34 @@ dataset:
       resize_to_hw:
       - 160
       - 544
+    - name: kitti
+      disp_name: kitti
+      dir: kitti
+      filenames: data_split/kitti_paths.txt
+      kitti_bm_crop: true
+      valid_mask_crop: eigen
+      norm_name: kitti
+      resize_to_hw:
+      - 160
+      - 544
+    - name: nyu_v2
+      disp_name: nyu_v2
+      dir: nyu_v2
+      filenames: data_split/nyu_2_paths.txt
+      eigen_valid_mask: true
+      norm_name: nyu
+      resize_to_hw:
+      - 256
+      - 352
+    - name: hypersim
+      disp_name: hypersim_test
+      dir: hypersim/data
+      filenames: data_split/hypersim_test.txt
+      norm_name: hypersim
+      resize_to_hw:
+      - 256
+      - 352
+
 
 depth_normalization:
   type: scale_shift_depth
@@ -89,7 +117,7 @@ optimizer:
   name: AdamW
 
 loss:
-  name: mixed
+  name: mse_loss_with_mask
   kwargs:
     reduction: mean
 
@@ -98,7 +126,7 @@ lr_scratch: 3.0e-03
 
 lr_scheduler:
   factor: 0.2
-  patience: 400
+  patience: 2
   min_lr: 3.0e-07
 
 # Validation settings
