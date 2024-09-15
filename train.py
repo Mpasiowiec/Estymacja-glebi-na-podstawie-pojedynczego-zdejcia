@@ -198,7 +198,7 @@ if "__main__" == __name__:
     val_dataset: BaseDepthDataset = get_dataset(
         cfg.dataset.val,
         base_data_dir=base_data_dir,
-        mode=DatasetMode.TRAIN,
+        mode=DatasetMode.EVAL,
         depth_transform=depth_transform,
         gt_depth_type=cfg.gt_depth_type
     )
@@ -237,7 +237,7 @@ if "__main__" == __name__:
         _test_dataset = get_dataset(
             _test_dic,
             base_data_dir=base_data_dir,
-            mode=DatasetMode.TRAIN,
+            mode=DatasetMode.EVAL,
             depth_transform=depth_transform,
             gt_depth_type=cfg.gt_depth_type
         )

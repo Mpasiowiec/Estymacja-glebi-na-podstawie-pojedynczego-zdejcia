@@ -135,7 +135,17 @@ class BaseDepthDataset(Dataset):
         if DatasetMode.TRAIN == self.mode:
             rasters = self._training_preprocess(rasters)
         else:
+            # Normalization
+            rasters["depth_raw_norm"] = self.depth_transform(
+                rasters["depth_raw_linear"], rasters["valid_mask_raw"]
+            ).clone()
             rasters = {k: self.trans(v) if k == "rgb_img" else v for k, v in rasters.items()}
+            # Resize
+            if self.resize_to_hw is not None:
+                resize_transform = Resize(
+                    size=self.resize_to_hw, interpolation=InterpolationMode.NEAREST_EXACT
+                )
+                rasters = {k: resize_transform(v) for k, v in rasters.items()}                      
         # merge
         outputs = rasters
         outputs.update(other)

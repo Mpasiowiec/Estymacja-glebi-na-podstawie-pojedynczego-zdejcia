@@ -135,14 +135,8 @@ class NetTrainer:
                 else:
                     self.model.eval()
                 
-                for batch in skip_first_batches(self.dataloaders[phase], self.n_batch_in_epoch if phase == 'train' else 0):
-                    
-                    if self.seed is None:
-                        local_seed = self._get_next_seed()
-                        rand_num_generator = torch.Generator(device=device)
-                        rand_num_generator.manual_seed(local_seed)
-                    else:
-                        rand_num_generator = None
+                stream = tqdm(skip_first_batches(self.dataloaders[phase], self.n_batch_in_epoch if phase == 'train' else 0))
+                for batch in stream:
                     
                     images = batch['rgb_img'].to(device, non_blocking=True)
                     
@@ -160,12 +154,11 @@ class NetTrainer:
                         output = self.model(images)
                         
                         loss = self.loss(output, target, mask)
-                        
-                        output_alig = output.clone()
-                        output_alig = output_alig.detach().cpu().numpy()
+                        self.metric_monitors[phase].update("loss", loss.item(), self.batch_size)
+
                         output_alig = align_depth_least_square(
                             gt_arr=target_for_alig,
-                            pred_arr=output_alig,
+                            pred_arr=output.detach().clone().cpu().numpy(),
                             valid_mask_arr=mask_for_alig,
                             return_scale_shift=False,
                             max_resolution=self.cfg.eval.align_max_res,
@@ -195,14 +188,14 @@ class NetTrainer:
                             _metric = met_func(output_alig, torch.from_numpy(target_for_alig).to(device), mask).item()
                             sample_metric.append(_metric.__str__())
                             self.metric_monitors[phase].update(_metric_name, _metric, self.batch_size)
-                        self.metric_monitors[phase].update("loss", loss.item(), self.batch_size)
+                        
                         
                         if phase == 'train':
                             loss.backward()
                             self.optimizer.step()
                             self.n_batch_in_epoch += 1
                             self.effective_iter += 1
-                            if self.effective_iter%10 == 0:
+                            if self.effective_iter%len(self.dataloaders[phase]) == 0:
                                 logging.debug(
                                     f"iter {self.effective_iter:5d} epoch [{epoch:2d}/{self.epochs_num:2d}]: loss={self.metric_monitors[phase].metrics['loss']['avg']:.5f}"
                                     )
@@ -259,18 +252,6 @@ class NetTrainer:
         time_elapsed = (datetime.now() - train_start).total_seconds()      
         logging.info(f'Training ended. Training time: {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
 
-
-
-    def _get_next_seed(self):
-        if 0 == len(self.global_seed_sequence):
-            self.global_seed_sequence = generate_seed_sequence(
-                initial_seed=self.seed,
-                length=self.max_iter,
-            )
-            logging.info(
-                f"Global seed sequence is generated, length={len(self.global_seed_sequence)}"
-            )
-        return self.global_seed_sequence.pop()
 
     def save_checkpoint(self, ckpt_name, save_train_state):
         ckpt_dir = os.path.join(self.out_dir_dic['ckpt'], ckpt_name)
