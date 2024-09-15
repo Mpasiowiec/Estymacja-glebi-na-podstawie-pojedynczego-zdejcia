@@ -1,7 +1,6 @@
 import argparse
 import logging
 import os
-import shutil
 from datetime import datetime, timedelta
 from typing import List
 
@@ -15,18 +14,14 @@ from models.TernausNet import UNet16
 
 from datasets import BaseDepthDataset, DatasetMode, get_dataset
 from datasets.mixed_sampler import MixedBatchSampler
-from trainers.old_trainer import NetTrainer
-from util.config_util import (
-    find_value_in_omegaconf,
-    recursive_load_config,
-)
+from trainers.trainer import NetTrainer
+from util.config_util import recursive_load_config
+
 from util.depth_transform import (
     DepthNormalizerBase,
     get_depth_normalizer,
 )
-from util.logging_util import(
-  config_logging
-)
+from util.logging_util import config_logging
 
 if "__main__" == __name__:
 
