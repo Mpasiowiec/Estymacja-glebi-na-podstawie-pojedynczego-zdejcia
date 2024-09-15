@@ -26,7 +26,6 @@ from util import metric
 from util.data_loader import skip_first_batches
 from util.loss import get_loss
 from util.alignment import align_depth_least_square
-from util.seeding import generate_seed_sequence
 
 class NetTrainer:
     def __init__(
