@@ -12,12 +12,12 @@ dataloader:
 # Training settings
 trainer:
   init_seed: 2024  # use null to train w/o seeding
-  save_period: 50
+  save_period: 0
 
 gt_depth_type: depth_raw_linear
 gt_mask_type: valid_mask_raw
 
-epochs_num: 5  # a large enough number
+epochs_num: 3  # a large enough number
 
 model:
   name: MiDas
@@ -85,7 +85,7 @@ optimizer:
   name: SGD
 
 loss:
-  name: mixed
+  name: l1_loss_with_mask
   kwargs:
     reduction: mean
 
