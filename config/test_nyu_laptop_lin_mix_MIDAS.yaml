@@ -23,6 +23,43 @@ model:
   name: MiDas
   backbone: resnext101_wsl
 
+loss:
+  name: mse_loss_with_mask
+  kwargs:
+    reduction: mean
+
+optimizer:
+  name: AdamW
+
+lr_pretrained: 3.0e-05
+lr_scratch: 3.0e-03
+
+lr_scheduler:
+  factor: 0.2
+  patience: 2
+  min_lr: 3.0e-07
+
+# Validation settings
+validation:
+  main_val_metric: abs_relative_difference
+  main_val_metric_goal: min
+  init_seed: 2024
+
+eval:
+  alignment: least_square
+  align_max_res: null
+  eval_metrics:
+  - abs_relative_difference
+  - squared_relative_difference
+  - rmse_linear
+  - rmse_log
+  - log10
+  - delta1_acc
+  - delta2_acc
+  - delta3_acc
+  - i_rmse
+  - silog_rmse
+
 dataset:
   train:
     name: nyu_v2
@@ -80,40 +117,3 @@ augmentation_args:
   red_green_channel_swap:
     in_use: true
     p: 0.25
-
-optimizer:
-  name: SGD
-
-loss:
-  name: l1_loss_with_mask
-  kwargs:
-    reduction: mean
-
-lr_pretrained: 3.0e-05
-lr_scratch: 3.0e-03
-
-lr_scheduler:
-  factor: 0.2
-  patience: 400
-  min_lr: 3.0e-07
-
-# Validation settings
-validation:
-  main_val_metric: abs_relative_difference
-  main_val_metric_goal: min
-  init_seed: 2024
-
-eval:
-  alignment: least_square
-  align_max_res: null
-  eval_metrics:
-  - abs_relative_difference
-  - squared_relative_difference
-  - rmse_linear
-  - rmse_log
-  - log10
-  - delta1_acc
-  - delta2_acc
-  - delta3_acc
-  - i_rmse
-  - silog_rmse
