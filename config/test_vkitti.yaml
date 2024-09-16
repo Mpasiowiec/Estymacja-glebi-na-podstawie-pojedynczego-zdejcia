@@ -5,8 +5,8 @@ dataloader:
   num_workers: 8
   pin_memory: true
   train_batch_size: 20
-  val_batch_size: 20
-  test_batch_size: 2
+  val_batch_size: 1
+  test_batch_size: 1
   seed: 2024  # to ensure continuity when resuming from checkpoint
 
 # Training settings
@@ -17,7 +17,7 @@ trainer:
 gt_depth_type: depth_raw_linear
 gt_mask_type: valid_mask_raw
 
-epochs_num: 5  # a large enough number
+epochs_num: 2  # a large enough number
 
 model:
   name: MiDas
@@ -91,9 +91,9 @@ dataset:
       kitti_bm_crop: True
       valid_mask_crop: eigen
       norm_name: vkitti2
-      resize_to_hw:
-      - 160
-      - 544
+      # resize_to_hw:
+      # - 160
+      # - 544
     - name: kitti
       disp_name: kitti
       dir: kitti
@@ -101,26 +101,26 @@ dataset:
       kitti_bm_crop: true
       valid_mask_crop: eigen
       norm_name: kitti
-      resize_to_hw:
-      - 160
-      - 544
+      # resize_to_hw:
+      # - 160
+      # - 544
     - name: nyu_v2
       disp_name: nyu_v2
       dir: nyu_v2
       filenames: data_split/nyu_2_paths.txt
       eigen_valid_mask: true
       norm_name: nyu
-      resize_to_hw:
-      - 256
-      - 352
+      # resize_to_hw:
+      # - 256
+      # - 352
     - name: hypersim
       disp_name: hypersim_test
       dir: hypersim/data
       filenames: data_split/hypersim_test.txt
       norm_name: hypersim
-      resize_to_hw:
-      - 256
-      - 352
+      # resize_to_hw:
+      # - 256
+      # - 352
 
 depth_normalization:
   type: scale_shift_depth
@@ -135,7 +135,7 @@ augmentation_args:
     p: 0.5
   jitter:
     in_use: true
-    p: 0.25
+    p: 0.5
     args:
       hue: 0.1
       brightness: 0.1
@@ -147,4 +147,4 @@ augmentation_args:
     par: 0.5
   red_green_channel_swap:
     in_use: true
-    p: 0.25
+    p: 0.5

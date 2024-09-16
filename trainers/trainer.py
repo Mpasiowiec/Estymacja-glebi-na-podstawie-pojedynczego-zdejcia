@@ -103,7 +103,6 @@ class NetTrainer:
         self.n_batch_in_epoch = 0  # batch index in the epoch, used when resume training
         self.effective_iter = 0  # how many times optimizer.step() is called
         self.in_evaluation = False
-        self.global_seed_sequence: List = []  # consistent global seed sequence, used to seed random generator, to ensure consistency when resuming
     
     def train_and_validate(self, t_end=None):
         logging.info('Start training')
@@ -137,10 +136,8 @@ class NetTrainer:
                     
                     images = batch['rgb_img'].to(device, non_blocking=True)
                     
-                    target_for_alig = batch['depth_raw_linear'].numpy()
                     target = batch[self.cfg.gt_depth_type].to(device, non_blocking=True)
                     
-                    mask_for_alig = batch['valid_mask_raw'].numpy()
                     mask = batch[self.cfg.gt_mask_type].to(device, non_blocking=True)
                     
                     self.batch_size = images.shape[0]
@@ -150,39 +147,43 @@ class NetTrainer:
                     with torch.set_grad_enabled(phase=='train'):
                         output = self.model(images)
                         
-                        output_alig = align_depth_least_square(
-                            gt_arr=target_for_alig,
-                            pred_arr=output.clone().detach().cpu().numpy(),
-                            valid_mask_arr=mask_for_alig,
-                            return_scale_shift=False,
-                            max_resolution=self.cfg.eval.align_max_res,
-                            )
-                        
-                        # Clip to dataset min max
-                        if type(self.dataloaders[phase]).__name__ == 'ConcatDataset':
-                          output_alig = np.clip(
-                              output_alig,
-                              a_min=self.dataloaders[phase].dataset.datasets[0].min_depth,
-                              a_max=self.dataloaders[phase].dataset.datasets[0].max_depth,
-                          )
-                        else:
-                          output_alig = np.clip(
-                              output_alig,
-                              a_min=self.dataloaders[phase].dataset.min_depth,
-                              a_max=self.dataloaders[phase].dataset.max_depth,
-                          )
-                        # clip to d > 0 for evaluation
-                        output_alig = np.clip(output_alig, a_min=1e-6, a_max=None)
-                        
-                        # Evaluate
-                        sample_metric = []
-                        output_alig = torch.from_numpy(output_alig).to(device)
-                        for met_func in self.metric_funcs:
-                            _metric_name = met_func.__name__
-                            _metric = met_func(output_alig, torch.from_numpy(target_for_alig).to(device), mask).item()
-                            sample_metric.append(_metric.__str__())
-                            self.metric_monitors[phase].update(_metric_name, _metric, self.batch_size)
+                        if phase == 'val':
+                          target_for_alig = batch['depth_raw_linear'].numpy()
+                          mask_for_alig = batch['valid_mask_raw'].numpy()
                     
+                          output_alig = align_depth_least_square(
+                              gt_arr=target_for_alig,
+                              pred_arr=output.clone().detach().cpu().numpy(),
+                              valid_mask_arr=mask_for_alig,
+                              return_scale_shift=False,
+                              max_resolution=self.cfg.eval.align_max_res,
+                              )
+                        
+                          # Clip to dataset min max
+                          if type(self.dataloaders[phase]).__name__ == 'ConcatDataset':
+                            output_alig = np.clip(
+                                output_alig,
+                                a_min=self.dataloaders[phase].dataset.datasets[0].min_depth,
+                                a_max=self.dataloaders[phase].dataset.datasets[0].max_depth,
+                           )
+                          else:
+                            output_alig = np.clip(
+                                output_alig,
+                                a_min=self.dataloaders[phase].dataset.min_depth,
+                                a_max=self.dataloaders[phase].dataset.max_depth,
+                            )
+                          # clip to d > 0 for evaluation
+                          output_alig = np.clip(output_alig, a_min=1e-6, a_max=None)
+
+                          # Evaluate
+                          sample_metric = []
+                          output_alig = torch.from_numpy(output_alig).to(device)
+                          for met_func in self.metric_funcs:
+                              _metric_name = met_func.__name__
+                              _metric = met_func(output_alig, torch.from_numpy(target_for_alig).to(device), mask).item()
+                              sample_metric.append(_metric.__str__())
+                              self.metric_monitors[phase].update(_metric_name, _metric, self.batch_size)
+
                         loss = self.loss(
                             output,
                             target,
@@ -220,7 +221,7 @@ class NetTrainer:
                         return
                     
                     stream.set_description(
-                      f"{phase}: loss: {self.metric_monitors[phase].metrics['loss']['avg']:.4f}, delta3_acc: {self.metric_monitors[phase].metrics['delta3_acc']['avg']:.4f}"
+                      f"{phase}: {self.metric_monitors[phase]}"
                       )
                     torch.cuda.empty_cache()
                     
@@ -288,7 +289,6 @@ class NetTrainer:
                 'n_batch_in_epoch': self.n_batch_in_epoch,
                 'best_metric': self.best_metric,
                 'in_evaluation': self.in_evaluation,
-                'global_seed_sequence': self.global_seed_sequence,
             }
             train_state_path = os.path.join(ckpt_dir, 'trainer.ckpt')
             torch.save(state, train_state_path)
@@ -330,7 +330,6 @@ class NetTrainer:
             self.epoch = checkpoint['epoch']
             self.n_batch_in_epoch = checkpoint['n_batch_in_epoch']
             self.in_evaluation = checkpoint['in_evaluation']
-            self.global_seed_sequence = checkpoint['global_seed_sequence']
 
             self.best_metric = checkpoint['best_metric']
 
