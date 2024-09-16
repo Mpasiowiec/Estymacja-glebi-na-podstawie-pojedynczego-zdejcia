@@ -25,6 +25,8 @@ model:
 
 loss:
   name: com_loss
+  kwargs:
+    batch_reduction: True 
 
 optimizer:
   name: AdamW

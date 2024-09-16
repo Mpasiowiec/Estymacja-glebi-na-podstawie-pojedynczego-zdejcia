@@ -81,12 +81,12 @@ class NetTrainer:
         self.main_val_metric_goal = self.cfg.validation.main_val_metric_goal
         assert (
             self.main_val_metric in self.cfg.eval.eval_metrics
-        ), f"Main eval metric `{self.main_val_metric}` not found in evaluation metrics."
-        self.best_metric = 1e8 if "min" == self.main_val_metric_goal else -1e8
+        ), f'Main eval metric `{self.main_val_metric}` not found in evaluation metrics.'
+        self.best_metric = 1e8 if 'min' == self.main_val_metric_goal else -1e8
         self.best_model = copy.deepcopy(self.model.to(self.device).state_dict())
         self.model_datas = {
-            'train' : pd.DataFrame({"epoch": []}),  
-            'val'   : pd.DataFrame({"epoch": []}),
+            'train' : pd.DataFrame({'epoch': []}),  
+            'val'   : pd.DataFrame({'epoch': []}),
             }
         self.model_temp_data = pd.DataFrame({})
         self.metric_monitors = {
@@ -108,14 +108,14 @@ class NetTrainer:
         self.global_seed_sequence: List = []  # consistent global seed sequence, used to seed random generator, to ensure consistency when resuming
     
     def train_and_validate(self, t_end=None):
-        logging.info("Start training")
+        logging.info('Start training')
         train_start = datetime.now()
         
         device = self.device
         self.model.to(device)
         
         if self.in_evaluation: 
-            logging.info("Last evaluation was not finished, will do evaluation before continue training.")
+            logging.info('Last evaluation was not finished, will do evaluation before continue training.')
             self.epoch -= 1
             
         for epoch in range(self.epoch, self.epochs_num + 1):
@@ -153,7 +153,7 @@ class NetTrainer:
                         output = self.model(images)
                         
                         loss = self.loss(output, target, mask)
-                        self.metric_monitors[phase].update("loss", loss.item(), self.batch_size)
+                        self.metric_monitors[phase].update('loss', loss.item(), self.batch_size)
 
                         output_alig = align_depth_least_square(
                             gt_arr=target_for_alig,
@@ -196,10 +196,10 @@ class NetTrainer:
                             self.effective_iter += 1
                             if self.effective_iter%len(self.dataloaders[phase]) == 0:
                                 logging.debug(
-                                    f"iter {self.effective_iter:5d} epoch [{epoch:2d}/{self.epochs_num:2d}]: loss={self.metric_monitors[phase].metrics['loss']['avg']:.5f}"
+                                    f'iter {self.effective_iter:5d} epoch [{epoch:2d}/{self.epochs_num:2d}]: loss={self.metric_monitors[phase].metrics['loss']['avg']:.5f}'
                                     )
                                 logging.debug(
-                                    f"lr {self.lr_scheduler.get_last_lr()}, n_batch_in_epoch ({self.n_batch_in_epoch}/{len(self.dataloaders[phase])})"
+                                    f'lr {self.lr_scheduler.get_last_lr()}, n_batch_in_epoch ({self.n_batch_in_epoch}/{len(self.dataloaders[phase])})'
                                     )                            
                     
                     _is_latest_saved = False        
@@ -208,16 +208,19 @@ class NetTrainer:
                         and 0 == self.effective_iter % self.save_period
                         and not _is_latest_saved
                     ):
-                        self.save_checkpoint(ckpt_name="latest", save_train_state=True)
+                        self.save_checkpoint(ckpt_name='latest', save_train_state=True)
                         _is_latest_saved = True
                             
                     if t_end is not None and datetime.now() >= t_end:
                         if not _is_latest_saved:
-                            self.save_checkpoint(ckpt_name="latest", save_train_state=True)
+                            self.save_checkpoint(ckpt_name='latest', save_train_state=True)
                         time_elapsed = (datetime.now() - train_start).total_seconds()
                         logging.info(f'Time is up, training paused. Training time: {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
                         return
                     
+                    stream.set_description(
+                        f'{phase}: {' | '.join([f'{'loss'}: {metric['avg']:.4f}', f'{self.main_val_metric}: {self.metric_monitors[phase].metrics[self.main_val_metric]['avg']:.4f}'])}'
+                        )
                     torch.cuda.empty_cache()
                     
                 if phase == 'train':
@@ -227,7 +230,7 @@ class NetTrainer:
                     self.in_evaluation = False
                     
                 for metric_name in self.metric_monitors[phase].metrics:
-                    self.model_datas[phase].at[self.epoch-1, metric_name] = self.metric_monitors[phase].metrics[metric_name]["avg"]
+                    self.model_datas[phase].at[self.epoch-1, metric_name] = self.metric_monitors[phase].metrics[metric_name]['avg']
                 self.model_datas[phase].to_csv(os.path.join(self.out_dir_dic['rec'], phase+'_record.csv'), index=False)
                 self.metric_monitors[phase].reset()
                 
@@ -236,15 +239,15 @@ class NetTrainer:
                     phase == 'val'
                     and 
                         (
-                            ("min" == self.main_val_metric_goal and epoch_main_metric < self.best_metric)
+                            ('min' == self.main_val_metric_goal and epoch_main_metric < self.best_metric)
                             or
-                            ("max" == self.main_val_metric_goal and epoch_main_metric > self.best_metric)
+                            ('max' == self.main_val_metric_goal and epoch_main_metric > self.best_metric)
                         )
                     ):
                     self.best_metric = epoch_main_metric
                     self.best_model = copy.deepcopy(self.model.state_dict())
                 
-                self.save_checkpoint(ckpt_name="latest", save_train_state=True)               
+                self.save_checkpoint(ckpt_name='latest', save_train_state=True)               
                 
             self.n_batch_in_epoch = 0
             
@@ -254,17 +257,17 @@ class NetTrainer:
 
     def save_checkpoint(self, ckpt_name, save_train_state):
         ckpt_dir = os.path.join(self.out_dir_dic['ckpt'], ckpt_name)
-        logging.debug(f"at iteration {self.effective_iter} Saving checkpoint to: {ckpt_dir}")
+        logging.debug(f'at iteration {self.effective_iter} Saving checkpoint to: {ckpt_dir}')
         # Backup previous checkpoint
         temp_ckpt_dir = None
         if os.path.exists(ckpt_dir) and os.path.isdir(ckpt_dir):
             temp_ckpt_dir = os.path.join(
-                os.path.dirname(ckpt_dir), f"_old_{os.path.basename(ckpt_dir)}"
+                os.path.dirname(ckpt_dir), f'_old_{os.path.basename(ckpt_dir)}'
             )
             if os.path.exists(temp_ckpt_dir):
                 shutil.rmtree(temp_ckpt_dir, ignore_errors=True)
             os.rename(ckpt_dir, temp_ckpt_dir)
-            logging.debug(f"Old checkpoint is backed up at: {temp_ckpt_dir}")
+            logging.debug(f'Old checkpoint is backed up at: {temp_ckpt_dir}')
         
         os.makedirs(ckpt_dir)
 
@@ -272,70 +275,70 @@ class NetTrainer:
         net_path = os.path.join(ckpt_dir, 'net.pth')
         torch.save(self.model.state_dict(), net_path)
         torch.save(self.best_model, os.path.join(ckpt_dir, 'best_net.pth'))
-        logging.debug(f"Network weights are saved to: {net_path}")
+        logging.debug(f'Network weights are saved to: {net_path}')
 
         if save_train_state:
             state = {
-                "optimizer": self.optimizer.state_dict(),
-                "lr_scheduler": self.lr_scheduler.state_dict(),
-                "config": self.cfg,
-                "effective_iter": self.effective_iter,
-                "epoch": self.epoch,
-                "n_batch_in_epoch": self.n_batch_in_epoch,
-                "best_metric": self.best_metric,
-                "in_evaluation": self.in_evaluation,
-                "global_seed_sequence": self.global_seed_sequence,
+                'optimizer': self.optimizer.state_dict(),
+                'lr_scheduler': self.lr_scheduler.state_dict(),
+                'config': self.cfg,
+                'effective_iter': self.effective_iter,
+                'epoch': self.epoch,
+                'n_batch_in_epoch': self.n_batch_in_epoch,
+                'best_metric': self.best_metric,
+                'in_evaluation': self.in_evaluation,
+                'global_seed_sequence': self.global_seed_sequence,
             }
-            train_state_path = os.path.join(ckpt_dir, "trainer.ckpt")
+            train_state_path = os.path.join(ckpt_dir, 'trainer.ckpt')
             torch.save(state, train_state_path)
             # iteration indicator
-            f = open(os.path.join(ckpt_dir, self._get_backup_ckpt_name()), "w")
+            f = open(os.path.join(ckpt_dir, self._get_backup_ckpt_name()), 'w')
             f.close()
 
-            logging.debug(f"Trainer state is saved to: {train_state_path}")        
+            logging.debug(f'Trainer state is saved to: {train_state_path}')        
 
         for metric_name in self.metric_monitors['train'].metrics:
-                self.model_temp_data.at[0, metric_name] = self.metric_monitors['train'].metrics[metric_name]["val"]
-                self.model_temp_data.at[1, metric_name] = self.metric_monitors['train'].metrics[metric_name]["count"]
-                self.model_temp_data.at[2, metric_name] = self.metric_monitors['train'].metrics[metric_name]["avg"]
+                self.model_temp_data.at[0, metric_name] = self.metric_monitors['train'].metrics[metric_name]['val']
+                self.model_temp_data.at[1, metric_name] = self.metric_monitors['train'].metrics[metric_name]['count']
+                self.model_temp_data.at[2, metric_name] = self.metric_monitors['train'].metrics[metric_name]['avg']
         self.model_temp_data.to_csv(os.path.join(self.out_dir_dic['rec'],'temp_record.csv'), index=False)
             
         
         # Remove temp ckpt
         if temp_ckpt_dir is not None and os.path.exists(temp_ckpt_dir):
             shutil.rmtree(temp_ckpt_dir, ignore_errors=True)
-            logging.debug("Old checkpoint backup is removed.")
+            logging.debug('Old checkpoint backup is removed.')
 
     def load_checkpoint(
         self, ckpt_path, load_trainer_state=True, resume_lr_scheduler=True
     ):
-        logging.info(f"Loading checkpoint from: {ckpt_path}")
+        logging.info(f'Loading checkpoint from: {ckpt_path}')
         # Load Net
-        _model_path = os.path.join(ckpt_path, "net.pth")
-        self.best_model = torch.load(os.path.join(ckpt_path, "best_net.pth"), map_location=self.device)
+        _model_path = os.path.join(ckpt_path, 'net.pth')
+        self.best_model = torch.load(os.path.join(ckpt_path, 'best_net.pth'), map_location=self.device)
         self.model.load_state_dict(
             torch.load(_model_path, map_location=self.device)
         )
         self.model.to(self.device)
-        logging.info(f"Net parameters are loaded from {_model_path}")
+        logging.info(f'Net parameters are loaded from {_model_path}')
 
         # Load training states
         if load_trainer_state:
-            checkpoint = torch.load(os.path.join(ckpt_path, "trainer.ckpt"))
-            self.effective_iter = checkpoint["effective_iter"]
-            self.epoch = checkpoint["epoch"]
-            self.n_batch_in_epoch = checkpoint["n_batch_in_epoch"]
-            self.in_evaluation = checkpoint["in_evaluation"]
-            self.global_seed_sequence = checkpoint["global_seed_sequence"]
+            checkpoint = torch.load(os.path.join(ckpt_path, 'trainer.ckpt'))
+            self.effective_iter = checkpoint['effective_iter']
+            self.epoch = checkpoint['epoch']
+            self.n_batch_in_epoch = checkpoint['n_batch_in_epoch']
+            self.in_evaluation = checkpoint['in_evaluation']
+            self.global_seed_sequence = checkpoint['global_seed_sequence']
 
-            self.best_metric = checkpoint["best_metric"]
+            self.best_metric = checkpoint['best_metric']
 
-            self.optimizer.load_state_dict(checkpoint["optimizer"])
-            logging.info(f"optimizer state is loaded from {ckpt_path}")
+            self.optimizer.load_state_dict(checkpoint['optimizer'])
+            logging.info(f'optimizer state is loaded from {ckpt_path}')
 
             if resume_lr_scheduler:
-                self.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
-                logging.info(f"LR scheduler state is loaded from {ckpt_path}")
+                self.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+                logging.info(f'LR scheduler state is loaded from {ckpt_path}')
 
         self.metric_monitors['train'].load(os.path.join(self.out_dir_dic['rec'],'temp_record.csv'))
         
@@ -344,9 +347,9 @@ class NetTrainer:
         if os.path.exists(os.path.join(self.out_dir_dic['rec'],'eval_record.csv')):
             self.model_datas['val'] = pd.read_csv(os.path.join(self.out_dir_dic['rec'],'eval_record.csv'))
         logging.info(
-            f"Checkpoint loaded from: {ckpt_path}. Resume from iteration {self.effective_iter} (epoch {self.epoch})"
+            f'Checkpoint loaded from: {ckpt_path}. Resume from iteration {self.effective_iter} (epoch {self.epoch})'
         )
         return
 
     def _get_backup_ckpt_name(self):
-        return f"iter_{self.effective_iter:06d}"
+        return f'iter_{self.effective_iter:06d}'

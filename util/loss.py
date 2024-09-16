@@ -212,6 +212,13 @@ class combinedLoss:
     def __call__(self, depth_pred, depth_gt, valid_mask=None):
         diff = depth_pred - depth_gt
         
+        x_grad_gt = depth_gt[:,:,:, 0:-2] - depth_gt[:,:,:, 2:]
+        x_grad_pr = depth_pred[:,:,:, 0:-2] - depth_pred[:,:,:, 2:]
+        y_grad_gt = depth_gt[:,:,0:-2, :] - depth_gt[:,:,2:, :]
+        y_grad_pr = depth_pred[:,:,0:-2, :] - depth_pred[:,:,2:, :]
+        x_grad_dif = x_grad_gt - x_grad_pr
+        y_grad_dif = y_grad_gt - y_grad_pr        
+        
         gt = depth_gt.clone()
         pred = depth_pred.clone()
         
@@ -219,6 +226,8 @@ class combinedLoss:
             diff[~valid_mask] = 0
             n = valid_mask.sum((-1, -2))
             
+            x_mask = torch.mul(valid_mask[:,:,:, 0:-2], valid_mask[:,:,:, 2:])
+            y_mask = torch.mul(valid_mask[:,:,0:-2, :], valid_mask[:,:,2:, :])
             x_grad_dif[~x_mask] = 0
             y_grad_dif[~y_mask] = 0
             n_x = x_mask.sum((-1, -2))
@@ -234,14 +243,6 @@ class combinedLoss:
         
         loss_mae = torch.sum(torch.abs(diff), (-1, -2)) / n
         
-        x_grad_gt = depth_gt[:,:,:, 0:-2] - depth_gt[:,:,:, 2:]
-        x_grad_pr = depth_pred[:,:,:, 0:-2] - depth_pred[:,:,:, 2:]
-        y_grad_gt = depth_gt[:,:,0:-2, :] - depth_gt[:,:,2:, :]
-        y_grad_pr = depth_pred[:,:,0:-2, :] - depth_pred[:,:,2:, :]
-        x_grad_dif = x_grad_gt - x_grad_pr
-        y_grad_dif = y_grad_gt - y_grad_pr
-        x_mask = torch.mul(valid_mask[:,:,:, 0:-2], valid_mask[:,:,:, 2:])
-        y_mask = torch.mul(valid_mask[:,:,0:-2, :], valid_mask[:,:,2:, :])
         loss_grad = (torch.sum(torch.abs(x_grad_dif), (-1, -2)) / n_x + torch.sum(torch.abs(y_grad_dif), (-1, -2)) / n_y)
         
         (std_gt, mean_gt) = torch.std_mean(gt,dim=(-1,-2))

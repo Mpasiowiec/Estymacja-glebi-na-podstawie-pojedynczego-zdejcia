@@ -25,9 +25,11 @@ model:
 
 loss:
   name: com_loss
+  kwargs:
+    batch_reduction: True 
 
 optimizer:
-  name: AdamW
+  name: SGD
 
 lr_pretrained: 3.0e-05
 lr_scratch: 3.0e-03
