@@ -197,7 +197,7 @@ class NetTrainer:
                             self.effective_iter += 1
                             if self.effective_iter%(len(self.dataloaders[phase])//4) == 0:
                                 logging.debug(
-                                    f'iter {self.effective_iter:5d} epoch [{epoch:2d}/{self.epochs_num:2d}]: loss={self.metric_monitors[phase].metrics['loss']['avg']:.5f}'
+                                    f"iter {self.effective_iter:5d} epoch [{epoch:2d}/{self.epochs_num:2d}]: loss={self.metric_monitors[phase].metrics['loss']['avg']:.5f}"
                                     )
                                 logging.debug(
                                     f'lr {self.lr_scheduler.get_last_lr()}, n_batch_in_epoch ({self.n_batch_in_epoch}/{len(self.dataloaders[phase])})'
@@ -220,11 +220,8 @@ class NetTrainer:
                         return
                     
                     stream.set_description(
-                        f'{phase}: {' | '.join([
-                            f'{'loss'}: {self.metric_monitors[phase].metrics['loss']['avg']:.4f}',
-                            f'{'delta3_acc'}: {self.metric_monitors[phase].metrics['delta3_acc']['avg']:.4f}'
-                            ])}'
-                        )
+                      f"{phase}: loss: {self.metric_monitors[phase].metrics['loss']['avg']:.4f}, delta3_acc: {self.metric_monitors[phase].metrics['delta3_acc']['avg']:.4f}"
+                      )
                     torch.cuda.empty_cache()
                     
                 if phase == 'train':
