@@ -1,5 +1,3 @@
-# Adopted: https://github.com/prs-eth/Marigold/blob/main/src/trainer/marigold_trainer.py
-
 import logging
 import os
 import shutil
@@ -152,12 +150,9 @@ class NetTrainer:
                     with torch.set_grad_enabled(phase=='train'):
                         output = self.model(images)
                         
-                        loss = self.loss(output, target, mask)
-                        self.metric_monitors[phase].update('loss', loss.item(), self.batch_size)
-
                         output_alig = align_depth_least_square(
                             gt_arr=target_for_alig,
-                            pred_arr=output.detach().clone().cpu().numpy(),
+                            pred_arr=output.clone().detach().cpu().numpy(),
                             valid_mask_arr=mask_for_alig,
                             return_scale_shift=False,
                             max_resolution=self.cfg.eval.align_max_res,
@@ -187,14 +182,20 @@ class NetTrainer:
                             _metric = met_func(output_alig, torch.from_numpy(target_for_alig).to(device), mask).item()
                             sample_metric.append(_metric.__str__())
                             self.metric_monitors[phase].update(_metric_name, _metric, self.batch_size)
-                        
+                    
+                        loss = self.loss(
+                            output,
+                            target,
+                            mask
+                            )
+                        self.metric_monitors[phase].update('loss', loss.item(), self.batch_size)
                         
                         if phase == 'train':
                             loss.backward()
                             self.optimizer.step()
                             self.n_batch_in_epoch += 1
                             self.effective_iter += 1
-                            if self.effective_iter%len(self.dataloaders[phase]) == 0:
+                            if self.effective_iter%len(self.dataloaders[phase]//4) == 0:
                                 logging.debug(
                                     f'iter {self.effective_iter:5d} epoch [{epoch:2d}/{self.epochs_num:2d}]: loss={self.metric_monitors[phase].metrics['loss']['avg']:.5f}'
                                     )
@@ -219,7 +220,10 @@ class NetTrainer:
                         return
                     
                     stream.set_description(
-                        f'{phase}: {' | '.join([f'{'loss'}: {metric['avg']:.4f}', f'{self.main_val_metric}: {self.metric_monitors[phase].metrics[self.main_val_metric]['avg']:.4f}'])}'
+                        f'{phase}: {' | '.join([
+                            f'{'loss'}: {self.metric_monitors[phase].metrics['loss']['avg']:.4f}',
+                            f'{'delta3_acc'}: {self.metric_monitors[phase].metrics['delta3_acc']['avg']:.4f}'
+                            ])}'
                         )
                     torch.cuda.empty_cache()
                     

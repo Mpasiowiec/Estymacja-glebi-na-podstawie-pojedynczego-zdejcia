@@ -6,7 +6,7 @@ dataloader:
   pin_memory: true
   train_batch_size: 8
   val_batch_size: 8
-  test_batch_size: 2
+  test_batch_size: 1
   seed: 2024  # to ensure continuity when resuming from checkpoint
 
 # Training settings
@@ -17,11 +17,11 @@ trainer:
 gt_depth_type: depth_raw_linear
 gt_mask_type: valid_mask_raw
 
-epochs_num: 3  # a large enough number
+epochs_num: 10  # a large enough number
 
 model:
   name: MiDas
-  backbone: resnext101_wsl
+  backbone: resnet101
 
 loss:
   name: com_loss
@@ -29,10 +29,10 @@ loss:
     batch_reduction: True 
 
 optimizer:
-  name: SGD
+  name: Adam
 
-lr_pretrained: 3.0e-05
-lr_scratch: 3.0e-03
+lr_pretrained: 1.0e-04
+lr_scratch: 1.0e-04
 
 lr_scheduler:
   factor: 0.2
@@ -89,8 +89,8 @@ dataset:
       eigen_valid_mask: true
       norm_name: nyu
       resize_to_hw:
-      - 128
-      - 128
+      - 384
+      - 384
 
 depth_normalization:
   type: scale_shift_depth
@@ -104,16 +104,16 @@ augmentation_args:
     in_use: true
     p: 0.5
   jitter:
-    in_use: true
+    in_use: false
     p: 0.25
     args:
       hue: 0.1
       brightness: 0.1
       contrast: 0.1
   cutdepth:
-    in_use: true
+    in_use: false
     p: 0.5
     par: 0.5
   red_green_channel_swap:
-    in_use: true
+    in_use: false
     p: 0.25
