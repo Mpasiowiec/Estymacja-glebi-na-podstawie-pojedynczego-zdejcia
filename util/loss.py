@@ -1,9 +1,6 @@
 # Copied from https://github.com/prs-eth/Marigold/blob/main/src/util/loss.py
 
 import torch
-from util.alignment import align_depth_least_square
-
-
 
 def get_loss(loss_name, **kwargs):
     if "silog_mse" == loss_name:
@@ -11,21 +8,17 @@ def get_loss(loss_name, **kwargs):
     elif "silog_rmse" == loss_name:
         criterion = SILogRMSELoss(**kwargs)
     elif "mse_loss" == loss_name:
-        criterion = torch.nn.MSELoss(**kwargs)
-    elif "mse_loss_with_mask" == loss_name:
         criterion = MSELossWithMask(**kwargs)
-    elif "l1_loss" == loss_name:
-        criterion = torch.nn.L1Loss(**kwargs)
-    elif "l1_loss_with_mask" == loss_name:
+    elif "mae_loss" == loss_name:
         criterion = L1LossWithMask(**kwargs)
-    elif "mean_abs_rel" == loss_name:
+    elif "mare_loss" == loss_name:
         criterion = MeanAbsRelLoss(**kwargs)
     elif "ge_loss" == loss_name:
         criterion = GELoss(**kwargs)
     elif "ssim_loss" == loss_name:
         criterion = SSIMLoss(**kwargs)
-    elif "mixed" == loss_name:
-        criterion = mixLoss(**kwargs)
+    elif "com_loss" == loss_name:
+        criterion = combinedLoss(**kwargs)
         
         
         
@@ -42,55 +35,6 @@ def get_loss(loss_name, **kwargs):
         raise NotImplementedError
 
     return criterion
-
-
-class L1LossWithMask:
-    def __init__(self, batch_reduction=True, reduction='mean'):
-        self.batch_reduction = batch_reduction
-        self.reduction = reduction
-
-    def __call__(self, depth_pred, depth_gt, valid_mask=None):
-        diff = depth_pred - depth_gt
-        if valid_mask is not None:
-            diff[~valid_mask] = 0
-            n = valid_mask.sum((-1, -2))
-        else:
-            n = depth_gt.shape[-2] * depth_gt.shape[-1]
-
-        loss = torch.sum(torch.abs(diff)) / n
-        if self.batch_reduction:
-            loss = loss.mean()
-        return loss
-    
-class MSELossWithMask:
-    def __init__(self, batch_reduction=True, reduction='mean'):
-        self.batch_reduction = batch_reduction
-        self.reduction = reduction
-
-    def __call__(self, depth_pred, depth_gt, valid_mask=None):
-        diff = depth_pred - depth_gt
-        if valid_mask is not None:
-            diff[~valid_mask] = 0
-            n = valid_mask.sum((-1, -2))
-        else:
-            n = depth_gt.shape[-2] * depth_gt.shape[-1]
-
-        loss = torch.sum(torch.pow(diff,2)) / n
-        if self.batch_reduction:
-            loss = loss.mean()
-        return loss
-
-
-class MeanAbsRelLoss:
-    def __init__(self) -> None:
-        # super().__init__()
-        pass
-
-    def __call__(self, pred, gt):
-        diff = pred - gt
-        rel_abs = torch.abs(diff / gt)
-        loss = torch.mean(rel_abs, dim=0)
-        return loss
 
 
 class SILogMSELoss:
@@ -130,7 +74,7 @@ class SILogMSELoss:
 
 
 class SILogRMSELoss:
-    def __init__(self, lamb, alpha, log_pred=True):
+    def __init__(self, lamb, alpha, log_pred=True, batch_reduction=True):
         """Scale Invariant Log RMSE Loss
 
         Args:
@@ -142,13 +86,11 @@ class SILogRMSELoss:
         self.lamb = lamb
         self.alpha = alpha
         self.pred_in_log = log_pred
+        self.batch_reduction = batch_reduction
 
-    def __call__(self, depth_pred, depth_gt, valid_mask):
+    def __call__(self, depth_pred, depth_gt, valid_mask=None):
         log_depth_pred = depth_pred if self.pred_in_log else torch.log(depth_pred)
         log_depth_gt = torch.log(depth_gt)
-        # borrowed from https://github.com/aliyun/NeWCRFs
-        # diff = log_depth_pred[valid_mask] - log_depth_gt[valid_mask]
-        # return torch.sqrt((diff ** 2).mean() - self.lamb * (diff.mean() ** 2)) * self.alpha
 
         diff = log_depth_pred - log_depth_gt
         if valid_mask is not None:
@@ -160,71 +102,15 @@ class SILogRMSELoss:
         diff2 = torch.pow(diff, 2)
         first_term = torch.sum(diff2, (-1, -2)) / n
         second_term = self.lamb * torch.pow(torch.sum(diff, (-1, -2)), 2) / (n**2)
-        loss = torch.sqrt(first_term - second_term).mean() * self.alpha
+        loss = torch.sqrt(first_term - second_term) * self.alpha
+        if self.batch_reduction:
+            loss = loss.mean()        
         return loss
 
-
-
-class GELoss():
-    def __init__(self, batch_reduction=False):
+class MSELossWithMask:
+    def __init__(self, alpha=1, batch_reduction=True):
+        self.alpha = alpha
         self.batch_reduction = batch_reduction
-    
-    def __call__(self, depth_pred, depth_gt, valid_mask):
-        
-        x_grad_gt = depth_gt[:,:,0:-2, :] - depth_gt[:,:,2:, :]
-        x_grad_pr = depth_pred[:,:,0:-2, :] - depth_pred[:,:,2:, :]
-
-        y_grad_gt = depth_gt[:,:,:, 0:-2] - depth_gt[:,:,:, 2:]
-        y_grad_pr = depth_pred[:,:,:, 0:-2] - depth_pred[:,:,:, 2:]
-
-        x_grad_dif = torch.abs(x_grad_gt - x_grad_pr)
-        y_grad_dif = torch.abs(y_grad_gt - y_grad_pr)
-
-        x_mask = torch.mul(valid_mask[:,:,0:-2, :], valid_mask[:,:,2:, :])
-        y_mask = torch.mul(valid_mask[:,:,:, 0:-2], valid_mask[:,:,:, 2:])
-
-        x_grad_dif_masked = torch.mul(x_grad_dif,x_mask)
-        y_grad_dif_masked = torch.mul(y_grad_dif,y_mask)
-
-        grad_loss = x_grad_dif_masked.mean((-1,-2)) + y_grad_dif_masked.mean((-1,-2))
-
-        if self.batch_reduction:
-            grad_loss = grad_loss.mean()        
-        
-        # d_diff = depth_pred - depth_gt
-        # d_diff = torch.mul(d_diff, valid_mask)
-        # v_gradient = torch.abs(d_diff[:,:,0:-2, :] - d_diff[:,:,2:, :])
-        # v_mask = torch.mul(valid_mask[:,:,0:-2, :], valid_mask[:,:,2:, :])
-        # v_gradient = torch.mul(v_gradient, v_mask)
-        # h_gradient = torch.abs(d_diff[:,:,:, 0:-2] - d_diff[:,:,:, 2:])
-        # h_mask = torch.mul(valid_mask[:,:,:, 0:-2], valid_mask[:,:,:, 2:])
-        # h_gradient = torch.mul(h_gradient, h_mask)
-        # gradient_loss = h_gradient.sum() + v_gradient.sum()
-        # valid_num = torch.sum(h_mask) + torch.sum(v_mask)
-        # gradient_loss = gradient_loss / (valid_num + 1e-8)
-        # if self.batch_reduction:
-        #     gradient_loss = gradient_loss.mean()
-        return grad_loss
-
-class SSIMLoss:
-    def __init__(self, batch_reduction=False):
-        self.batch_reduction = batch_reduction
-
-    def __call__(self, depth_pred, depth_gt, valid_mask=None):
-        (std_pred, mean_pred) = torch.std_mean(depth_pred,dim=(-1,-2))
-        (std_gt, mean_gt) = torch.std_mean(depth_gt,dim=(-1,-2))
-        
-        
-        loss = (2*mean_pred*mean_gt + 1.0e-06)*(2*std_pred*std_gt + 1.0e-06)/((mean_pred*mean_pred + mean_gt*mean_gt + 1.0e-06)*(std_pred*std_pred + std_gt*std_gt + 1.0e-06))
-        if self.batch_reduction:
-            loss = loss.mean()
-        return loss
-
-class mixLoss:
-    def __init__(self, batch_reduction=True, reduction='mean'):
-        self.batch_reduction = batch_reduction
-        self.reduction = reduction
-
 
     def __call__(self, depth_pred, depth_gt, valid_mask=None):
         diff = depth_pred - depth_gt
@@ -233,39 +119,141 @@ class mixLoss:
             n = valid_mask.sum((-1, -2))
         else:
             n = depth_gt.shape[-2] * depth_gt.shape[-1]
-        loss_mae = torch.sum(torch.abs(diff)) / n
-        if self.batch_reduction:
-            loss_mae = loss_mae.mean()
-        
-        x_grad_gt = depth_gt[:,:,0:-2, :] - depth_gt[:,:,2:, :]
-        x_grad_pr = depth_pred[:,:,0:-2, :] - depth_pred[:,:,2:, :]
-
-        y_grad_gt = depth_gt[:,:,:, 0:-2] - depth_gt[:,:,:, 2:]
-        y_grad_pr = depth_pred[:,:,:, 0:-2] - depth_pred[:,:,:, 2:]
-
-        x_grad_dif = torch.abs(x_grad_gt - x_grad_pr)
-        y_grad_dif = torch.abs(y_grad_gt - y_grad_pr)
-
-        x_mask = torch.mul(valid_mask[:,:,0:-2, :], valid_mask[:,:,2:, :])
-        y_mask = torch.mul(valid_mask[:,:,:, 0:-2], valid_mask[:,:,:, 2:])
-
-        x_grad_dif_masked = torch.mul(x_grad_dif,x_mask)
-        y_grad_dif_masked = torch.mul(y_grad_dif,y_mask)
-
-        grad_loss = x_grad_dif_masked.mean((-1,-2)) + y_grad_dif_masked.mean((-1,-2))
-
-        if self.batch_reduction:
-            grad_loss = grad_loss.mean() 
-        
-        (std_pred, mean_pred) = torch.std_mean(depth_pred,dim=(-1,-2))
-        (std_gt, mean_gt) = torch.std_mean(depth_gt,dim=(-1,-2))
-        
-        
-        loss = (2*mean_pred*mean_gt + 1.0e-06)*(2*std_pred*std_gt + 1.0e-06)/((mean_pred*mean_pred + mean_gt*mean_gt + 1.0e-06)*(std_pred*std_pred + std_gt*std_gt + 1.0e-06))
+        loss = self.alpha * torch.sum(torch.pow(diff,2), (-1, -2)) / n
         if self.batch_reduction:
             loss = loss.mean()
+        return loss
+
+class L1LossWithMask:
+    def __init__(self, alpha=1, batch_reduction=True):
+        self.alpha = alpha
+        self.batch_reduction = batch_reduction
+
+    def __call__(self, depth_pred, depth_gt, valid_mask=None):
+        diff = depth_pred - depth_gt
+        if valid_mask is not None:
+            diff[~valid_mask] = 0
+            n = valid_mask.sum((-1, -2))
+        else:
+            n = depth_gt.shape[-2] * depth_gt.shape[-1]
+        loss = self.alpha * torch.sum(torch.abs(diff), (-1, -2)) / n
+        if self.batch_reduction:
+            loss = loss.mean()
+        return loss
+
+class MeanAbsRelLoss:
+    def __init__(self, alpha=1, batch_reduction=True):
+        self.alpha = alpha
+        self.batch_reduction = batch_reduction
+
+    def __call__(self, depth_pred, depth_gt, valid_mask=None):
+        diff = depth_pred - depth_gt
+        if valid_mask is not None:
+            diff[~valid_mask] = 0
+            n = valid_mask.sum((-1, -2))
+        else:
+            n = depth_gt.shape[-2] * depth_gt.shape[-1]
+        loss = self.alpha * torch.sum(torch.abs(diff / depth_gt), (-1,-2)) / n
+        if self.batch_reduction:
+            loss = loss.mean()
+        return loss
+
+class GELoss():
+    def __init__(self, alpha=1, batch_reduction=True):
+        self.alpha = alpha
+        self.batch_reduction = batch_reduction
+    
+    def __call__(self, depth_pred, depth_gt, valid_mask=None):
+        x_grad_gt = depth_gt[:,:,:, 0:-2] - depth_gt[:,:,:, 2:]
+        x_grad_pr = depth_pred[:,:,:, 0:-2] - depth_pred[:,:,:, 2:]
+        y_grad_gt = depth_gt[:,:,0:-2, :] - depth_gt[:,:,2:, :]
+        y_grad_pr = depth_pred[:,:,0:-2, :] - depth_pred[:,:,2:, :]
+        x_grad_dif = x_grad_gt - x_grad_pr
+        y_grad_dif = y_grad_gt - y_grad_pr
+        x_mask = torch.mul(valid_mask[:,:,:, 0:-2], valid_mask[:,:,:, 2:])
+        y_mask = torch.mul(valid_mask[:,:,0:-2, :], valid_mask[:,:,2:, :])
+        if valid_mask is not None:
+            x_grad_dif[~x_mask] = 0
+            y_grad_dif[~y_mask] = 0
+            n_x = x_mask.sum((-1, -2))
+            n_y = y_mask.sum((-1, -2))
+        else:
+            n_x = x_grad_gt.shape[-2] * x_grad_gt.shape[-1]
+            n_y = y_grad_gt.shape[-2] * y_grad_gt.shape[-1]
+        loss = self.alpha * (torch.sum(torch.abs(x_grad_dif), (-1, -2)) / n_x + torch.sum(torch.abs(y_grad_dif), (-1, -2)) / n_y)
+        if self.batch_reduction:
+            loss = loss.mean()
+        return loss
+
+class SSIMLoss:
+    def __init__(self, alpha=1, batch_reduction=True):
+        self.alpha = alpha
+        self.batch_reduction = batch_reduction
+
+    def __call__(self, depth_pred, depth_gt, valid_mask=None):
+        gt = depth_gt.clone()
+        pred = depth_pred.clone()
+        if valid_mask is not None:
+            gt[~valid_mask] = 0
+            pred[~valid_mask] = 0
+        (std_gt, mean_gt) = torch.std_mean(gt,dim=(-1,-2))
+        (std_pred, mean_pred) = torch.std_mean(pred,dim=(-1,-2))
+        ssim = (2*mean_pred*mean_gt + 1.0e-08)*(2*std_pred*std_gt + 1.0e-08)/((mean_pred*mean_pred + mean_gt*mean_gt + 1.0e-08)*(std_pred*std_pred + std_gt*std_gt + 1.0e-08))
+        loss = self.alpha * (1 - 0.5 * ssim)
+        if self.batch_reduction:
+            loss = loss.mean()
+        return loss
+
+class combinedLoss:
+    def __init__(self, batch_reduction=True):
+        self.batch_reduction = batch_reduction
+
+
+    def __call__(self, depth_pred, depth_gt, valid_mask=None):
+        diff = depth_pred - depth_gt
+        
+        gt = depth_gt.clone()
+        pred = depth_pred.clone()
+        
+        if valid_mask is not None:
+            diff[~valid_mask] = 0
+            n = valid_mask.sum((-1, -2))
             
-        return 0.6 * loss_mae + 0.2 * grad_loss + loss
+            x_grad_dif[~x_mask] = 0
+            y_grad_dif[~y_mask] = 0
+            n_x = x_mask.sum((-1, -2))
+            n_y = y_mask.sum((-1, -2))
+            
+            gt[~valid_mask] = 0
+            pred[~valid_mask] = 0
+        else:
+            n = depth_gt.shape[-2] * depth_gt.shape[-1]
+            
+            n_x = x_grad_gt.shape[-2] * x_grad_gt.shape[-1]
+            n_y = y_grad_gt.shape[-2] * y_grad_gt.shape[-1]
+        
+        loss_mae = torch.sum(torch.abs(diff), (-1, -2)) / n
+        
+        x_grad_gt = depth_gt[:,:,:, 0:-2] - depth_gt[:,:,:, 2:]
+        x_grad_pr = depth_pred[:,:,:, 0:-2] - depth_pred[:,:,:, 2:]
+        y_grad_gt = depth_gt[:,:,0:-2, :] - depth_gt[:,:,2:, :]
+        y_grad_pr = depth_pred[:,:,0:-2, :] - depth_pred[:,:,2:, :]
+        x_grad_dif = x_grad_gt - x_grad_pr
+        y_grad_dif = y_grad_gt - y_grad_pr
+        x_mask = torch.mul(valid_mask[:,:,:, 0:-2], valid_mask[:,:,:, 2:])
+        y_mask = torch.mul(valid_mask[:,:,0:-2, :], valid_mask[:,:,2:, :])
+        loss_grad = (torch.sum(torch.abs(x_grad_dif), (-1, -2)) / n_x + torch.sum(torch.abs(y_grad_dif), (-1, -2)) / n_y)
+        
+        (std_gt, mean_gt) = torch.std_mean(gt,dim=(-1,-2))
+        (std_pred, mean_pred) = torch.std_mean(pred,dim=(-1,-2))
+        ssim = (2*mean_pred*mean_gt + 1.0e-08)*(2*std_pred*std_gt + 1.0e-08)/((mean_pred*mean_pred + mean_gt*mean_gt + 1.0e-08)*(std_pred*std_pred + std_gt*std_gt + 1.0e-08))
+        loss_ssim = 1 - 0.5 * ssim
+        
+        loss = 0.6 * loss_mae + 0.2 * loss_grad + loss_ssim
+        
+        if self.batch_reduction:
+            loss = loss.mean()
+        return loss
 
 
 

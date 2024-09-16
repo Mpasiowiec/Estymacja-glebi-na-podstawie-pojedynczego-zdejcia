@@ -6,7 +6,7 @@ dataloader:
   pin_memory: true
   train_batch_size: 8
   val_batch_size: 8
-  test_batch_size: 48
+  test_batch_size: 2
   seed: 2024  # to ensure continuity when resuming from checkpoint
 
 # Training settings
@@ -24,9 +24,7 @@ model:
   backbone: resnext101_wsl
 
 loss:
-  name: mse_loss_with_mask
-  kwargs:
-    reduction: mean
+  name: com_loss
 
 optimizer:
   name: AdamW

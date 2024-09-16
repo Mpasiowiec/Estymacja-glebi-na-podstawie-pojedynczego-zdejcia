@@ -24,9 +24,7 @@ model:
   backbone: resnext101_wsl
 
 loss:
-  name: mse_loss_with_mask
-  kwargs:
-    reduction: mean
+  name: com_loss
 
 optimizer:
   name: AdamW
