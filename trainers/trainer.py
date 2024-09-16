@@ -195,7 +195,7 @@ class NetTrainer:
                             self.optimizer.step()
                             self.n_batch_in_epoch += 1
                             self.effective_iter += 1
-                            if self.effective_iter%len(self.dataloaders[phase]//4) == 0:
+                            if self.effective_iter%(len(self.dataloaders[phase])//4) == 0:
                                 logging.debug(
                                     f'iter {self.effective_iter:5d} epoch [{epoch:2d}/{self.epochs_num:2d}]: loss={self.metric_monitors[phase].metrics['loss']['avg']:.5f}'
                                     )

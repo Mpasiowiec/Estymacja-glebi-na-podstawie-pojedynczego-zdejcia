@@ -6,7 +6,7 @@ dataloader:
   pin_memory: true
   train_batch_size: 8
   val_batch_size: 8
-  test_batch_size: 1
+  test_batch_size: 8
   seed: 2024  # to ensure continuity when resuming from checkpoint
 
 # Training settings
@@ -89,8 +89,8 @@ dataset:
       eigen_valid_mask: true
       norm_name: nyu
       resize_to_hw:
-      - 384
-      - 384
+      - 128 # 384
+      - 128 # 384
 
 depth_normalization:
   type: scale_shift_depth
