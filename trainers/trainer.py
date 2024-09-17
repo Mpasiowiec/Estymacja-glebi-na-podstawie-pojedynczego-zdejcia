@@ -108,10 +108,6 @@ class NetTrainer:
         
         device = self.device
         self.model.to(device)
-        
-        if self.in_evaluation: 
-            logging.info('Last evaluation was not finished, will do evaluation before continue training.')
-            self.epoch -= 1
             
         for epoch in range(self.epoch, self.epochs_num + 1):
             self.epoch = epoch
@@ -119,6 +115,7 @@ class NetTrainer:
             
             for phase in ['train', 'val']:
                 if self.in_evaluation and phase=='train':
+                    logging.info('Last evaluation was not finished, will do evaluation before continue training.')
                     self.in_evaluation = False
                     continue
                 
@@ -221,15 +218,7 @@ class NetTrainer:
                     stream.set_description(
                       f"{phase}: {self.metric_monitors[phase]}"
                       )
-                    if phase == 'train' and self.effective_iter % 34 == 1:
-                        f, ax = plt.subplots( nrows=1, ncols=3 )  # create figure & 1 axis
-                        f.set_figheight(6)
-                        f.set_figwidth(15)
-                        ax[0].imshow(np.clip((batch['rgb_img'][0].numpy()+1)/2, a_min=0, a_max=1).transpose(1,2,0))
-                        ax[1].imshow(batch['depth_raw_linear'][0][0])
-                        ax[2].imshow(output[0][0].detach().cpu())
-                        f.savefig(self.out_dir_dic['img']+f'/{self.epoch}_{self.n_batch_in_epoch}.png')   # save the figure to file
-                        plt.close(f)
+                    
                     torch.cuda.empty_cache()
 
                 for metric_name in self.metric_monitors[phase].metrics:
@@ -255,7 +244,17 @@ class NetTrainer:
                 self.save_checkpoint(ckpt_name='latest', save_train_state=True)               
                 
             self.n_batch_in_epoch = 0
-            
+                
+            if phase == 'val':
+                            f, ax = plt.subplots( nrows=1, ncols=3 )  # create figure & 1 axis
+                            f.set_figheight(6)
+                            f.set_figwidth(15)
+                            ax[0].imshow(np.clip((batch['rgb_img'][0].numpy()+1)/2, a_min=0, a_max=1).transpose(1,2,0))
+                            ax[1].imshow(batch['depth_raw_linear'][0][0])
+                            ax[2].imshow(output[0][0].detach().cpu())
+                            f.savefig(self.out_dir_dic['img']+f'/{self.epoch}_{self.n_batch_in_epoch}.png')   # save the figure to file
+                            plt.close(f)   
+                             
         time_elapsed = (datetime.now() - train_start).total_seconds()      
         logging.info(f'Training ended. Training time: {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
 

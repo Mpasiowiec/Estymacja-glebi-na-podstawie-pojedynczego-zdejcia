@@ -31,8 +31,8 @@ loss:
 optimizer:
   name: Adam
 
-lr_pretrained: 1.0e-04
-lr_scratch: 1.0e-03
+lr_pretrained: 1.0e-05
+lr_scratch: 1.0e-04
 
 lr_scheduler:
   kwargs:
