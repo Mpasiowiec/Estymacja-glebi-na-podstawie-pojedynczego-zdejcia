@@ -123,8 +123,10 @@ class NetTrainer:
                         self.in_evaluation = False
                         continue
                     self.model.train()
+                    stream = tqdm(skip_first_batches(self.dataloaders[phase], self.n_batch_in_epoch))
                 else:
                     self.model.eval()
+                    stream = tqdm(skip_first_batches(self.dataloaders[phase], 0))
                 
                 stream = tqdm(skip_first_batches(self.dataloaders[phase], self.n_batch_in_epoch if phase == 'train' else 0))
                 for batch in stream:

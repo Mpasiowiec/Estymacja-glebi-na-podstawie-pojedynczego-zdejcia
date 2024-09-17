@@ -29,15 +29,15 @@ loss:
     batch_reduction: True 
 
 optimizer:
-  name: Adam
+  name: AdamW
 
 lr_pretrained: 1.0e-05
-lr_scratch: 1.0e-04
+lr_scratch: 5.0e-05
 
 lr_scheduler:
   kwargs:
     factor: 0.2
-    patience: 2
+    patience: 1
     min_lr: 3.0e-07
     threshold: 0.0001
 
