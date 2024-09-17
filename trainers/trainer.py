@@ -3,7 +3,7 @@ import os
 import shutil
 from datetime import datetime
 from typing import List, Union
-
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
@@ -202,8 +202,8 @@ class NetTrainer:
                                     )
                                 logging.debug(
                                     f'lr {self.lr_scheduler.get_last_lr()}, n_batch_in_epoch ({self.n_batch_in_epoch}/{len(self.dataloaders[phase])})'
-                                    )                            
-                    
+                                    )
+
                     _is_latest_saved = False        
                     if (
                         self.save_period > 0
@@ -223,31 +223,36 @@ class NetTrainer:
                     stream.set_description(
                       f"{phase}: {self.metric_monitors[phase]}"
                       )
+                    if phase == 'train' and self.effective_iter % 34 == 1:
+                        f, ax = plt.subplots( nrows=1, ncols=3 )  # create figure & 1 axis
+                        f.set_figheight(6)
+                        f.set_figwidth(15)
+                        ax[0].imshow(np.clip((batch['rgb_img'][0].numpy()+1)/2, a_min=0, a_max=1).permute(1,2,0))
+                        ax[1].imshow(batch['depth_raw_linear'][0][0])
+                        ax[2].imshow(output[0][0].detach().cpu())
+                        f.savefig(self.out_dir_dic['img']+f'/{self.epoch}_{self.n_batch_in_epoch}.png')   # save the figure to file
+                        plt.close(f)
                     torch.cuda.empty_cache()
-                    
+
+                for metric_name in self.metric_monitors[phase].metrics:
+                    self.model_datas[phase].at[self.epoch-1, metric_name] = self.metric_monitors[phase].metrics[metric_name]['avg']
+                self.model_datas[phase].to_csv(os.path.join(self.out_dir_dic['rec'], phase+'_record.csv'), index=False)
+
                 if phase == 'train':
                     self.in_evaluation = True
                 else:
                     self.lr_scheduler.step(self.metric_monitors[phase].metrics['loss']['avg']) 
+                    
+                    epoch_main_metric = self.metric_monitors[phase].metrics[self.main_val_metric]['avg']
+                    if (('min' == self.main_val_metric_goal and epoch_main_metric < self.best_metric)
+                        or
+                        ('max' == self.main_val_metric_goal and epoch_main_metric > self.best_metric)):
+                        self.best_metric = epoch_main_metric
+                        self.best_model = copy.deepcopy(self.model.state_dict())
+                    
                     self.in_evaluation = False
                     
-                for metric_name in self.metric_monitors[phase].metrics:
-                    self.model_datas[phase].at[self.epoch-1, metric_name] = self.metric_monitors[phase].metrics[metric_name]['avg']
-                self.model_datas[phase].to_csv(os.path.join(self.out_dir_dic['rec'], phase+'_record.csv'), index=False)
                 self.metric_monitors[phase].reset()
-                
-                epoch_main_metric = self.metric_monitors[phase].metrics[self.main_val_metric]['avg']            
-                if (
-                    phase == 'val'
-                    and 
-                        (
-                            ('min' == self.main_val_metric_goal and epoch_main_metric < self.best_metric)
-                            or
-                            ('max' == self.main_val_metric_goal and epoch_main_metric > self.best_metric)
-                        )
-                    ):
-                    self.best_metric = epoch_main_metric
-                    self.best_model = copy.deepcopy(self.model.state_dict())
                 
                 self.save_checkpoint(ckpt_name='latest', save_train_state=True)               
                 
