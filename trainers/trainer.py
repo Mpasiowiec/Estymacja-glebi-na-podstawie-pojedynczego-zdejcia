@@ -123,11 +123,10 @@ class NetTrainer:
                         self.in_evaluation = False
                         continue
                     self.model.train()
-                    stream = tqdm(skip_first_batches(self.dataloaders[phase], self.n_batch_in_epoch))
                 else:
                     self.model.eval()
-                    stream = tqdm(skip_first_batches(self.dataloaders[phase], 0))
                 
+                stream = tqdm(skip_first_batches(self.dataloaders[phase], self.n_batch_in_epoch if phase == 'train' else 0))
                 for batch in stream:
                     
                     images = batch['rgb_img'].to(device, non_blocking=True)
@@ -142,13 +141,6 @@ class NetTrainer:
                     
                     with torch.set_grad_enabled(phase=='train'):
                         output = self.model(images)
-                        
-                        loss = self.loss(
-                            output,
-                            target,
-                            mask
-                            )
-                        self.metric_monitors[phase].update('loss', loss.item(), self.batch_size)
                         
                         if phase == 'val':
                           target_for_alig = batch['depth_raw_linear'].numpy()
@@ -186,7 +178,15 @@ class NetTrainer:
                               _metric = met_func(output_alig, torch.from_numpy(target_for_alig).to(device), mask).item()
                               sample_metric.append(_metric.__str__())
                               self.metric_monitors[phase].update(_metric_name, _metric, self.batch_size)
-                        else:
+
+                        loss = self.loss(
+                            output,
+                            target,
+                            mask
+                            )
+                        self.metric_monitors[phase].update('loss', loss.item(), self.batch_size)
+                        
+                        if phase == 'train':
                             loss.backward()
                             self.optimizer.step()
                             self.n_batch_in_epoch += 1
