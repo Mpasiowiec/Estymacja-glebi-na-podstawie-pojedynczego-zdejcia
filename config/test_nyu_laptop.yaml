@@ -91,8 +91,8 @@ dataset:
       eigen_valid_mask: true
       norm_name: nyu
       resize_to_hw:
-      - 128 # 384
-      - 128 # 384
+      - 384
+      - 384
 
 depth_normalization:
   type: scale_shift_depth
@@ -106,16 +106,16 @@ augmentation_args:
     in_use: true
     p: 0.5
   jitter:
-    in_use: false
-    p: 0.25
+    in_use: true
+    p: 0.5
     args:
       hue: 0.1
       brightness: 0.1
       contrast: 0.1
   cutdepth:
-    in_use: false
+    in_use: true
     p: 0.5
     par: 0.5
   red_green_channel_swap:
-    in_use: false
-    p: 0.25
+    in_use: true
+    p: 0.5
