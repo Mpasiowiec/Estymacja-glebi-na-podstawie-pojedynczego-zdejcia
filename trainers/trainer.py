@@ -64,9 +64,7 @@ class NetTrainer:
         self.lr_scheduler = ReduceLROnPlateau(
             optimizer=self.optimizer,
             mode=self.cfg.validation.main_val_metric_goal,
-            factor=self.cfg.lr_scheduler.factor,
-            patience=self.cfg.lr_scheduler.patience,
-            min_lr=self.cfg.lr_scheduler.min_lr,
+            **self.cfg.lr_scheduler.kwargs
             )
 
         # Loss
@@ -227,7 +225,7 @@ class NetTrainer:
                         f, ax = plt.subplots( nrows=1, ncols=3 )  # create figure & 1 axis
                         f.set_figheight(6)
                         f.set_figwidth(15)
-                        ax[0].imshow(np.clip((batch['rgb_img'][0].numpy()+1)/2, a_min=0, a_max=1).permute(1,2,0))
+                        ax[0].imshow(np.clip((batch['rgb_img'][0].numpy()+1)/2, a_min=0, a_max=1).transpose(1,2,0))
                         ax[1].imshow(batch['depth_raw_linear'][0][0])
                         ax[2].imshow(output[0][0].detach().cpu())
                         f.savefig(self.out_dir_dic['img']+f'/{self.epoch}_{self.n_batch_in_epoch}.png')   # save the figure to file

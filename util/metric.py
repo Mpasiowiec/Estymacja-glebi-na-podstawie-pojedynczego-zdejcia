@@ -21,11 +21,14 @@ class MetricMonitor:
         metric["avg"] = metric["val"] / metric["count"]
     
     def load(self, file_path):
-        df = pd.read_csv(file_path)
-        for metric_name in df.columns:
-            self.metrics[metric_name]["val"] = df.at[0, metric_name]
-            self.metrics[metric_name]["count"] = df.at[1, metric_name]
-            self.metrics[metric_name]["avg"] = df.at[2, metric_name]
+        try:
+            df = pd.read_csv(file_path)
+            for metric_name in df.columns:
+                self.metrics[metric_name]["val"] = df.at[0, metric_name]
+                self.metrics[metric_name]["count"] = df.at[1, metric_name]
+                self.metrics[metric_name]["avg"] = df.at[2, metric_name]
+        except pd.errors.EmptyDataError:
+            pass
 
     def __str__(self):
         return " | ".join(

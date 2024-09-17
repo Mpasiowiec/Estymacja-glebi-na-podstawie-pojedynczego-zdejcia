@@ -32,12 +32,14 @@ optimizer:
   name: Adam
 
 lr_pretrained: 1.0e-04
-lr_scratch: 1.0e-04
+lr_scratch: 1.0e-03
 
 lr_scheduler:
-  factor: 0.2
-  patience: 2
-  min_lr: 3.0e-07
+  kwargs:
+    factor: 0.2
+    patience: 2
+    min_lr: 3.0e-07
+    threshold: 0.0001
 
 # Validation settings
 validation:
