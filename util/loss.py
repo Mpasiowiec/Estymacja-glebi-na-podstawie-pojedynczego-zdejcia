@@ -22,9 +22,9 @@ def get_loss(loss_name, **kwargs):
     elif "ssitrim" == loss_name:
         criterion = SSITrim()
     elif "reg" == loss_name:
-        criterion = REG(**kwargs)
+        criterion = REG()
     elif "ssitrim_reg" == loss_name:
-        criterion = ssitrim_reg(**kwargs)
+        criterion = ssitrim_reg()
     else:
         raise NotImplementedError
 
@@ -174,6 +174,7 @@ class GELoss():
         else:
             n_x = x_grad_gt.shape[-2] * x_grad_gt.shape[-1]
             n_y = y_grad_gt.shape[-2] * y_grad_gt.shape[-1]
+        # loss = (torch.sum(torch.abs(x_grad_dif)) + torch.sum(torch.abs(y_grad_dif))) / (torch.sum(x_mask) + torch.sum(y_mask) + 1e-8)
         loss = self.alpha * (torch.sum(torch.abs(x_grad_dif), (-1, -2)) / n_x + torch.sum(torch.abs(y_grad_dif), (-1, -2)) / n_y)
         if self.batch_reduction:
             loss = loss.mean()
@@ -203,7 +204,14 @@ class combinedLoss:
         self.batch_reduction = batch_reduction
 
 
-    def __call__(self, depth_pred, depth_gt, valid_mask=None):
+    def __call__(self, depth_pred_, depth_gt_, valid_mask=None):
+        t_pr = torch.median(depth_pred_.flatten(start_dim=-2), dim=-1).values
+        s_pr = torch.abs((depth_pred_ - t_pr[:, :, None, None])).mean((-1,-2))
+        depth_pred = (depth_pred_ - t_pr[:, :, None, None]) / (s_pr[:, :, None, None]+ 1e-8)
+        t_gt = torch.median(depth_gt_.flatten(start_dim=-2), dim=-1).values
+        s_gt = torch.abs((depth_gt_ - t_gt[:, :, None, None])).mean((-1,-2))
+        depth_gt = (depth_gt_ - t_gt[:, :, None, None]) / (s_gt[:, :, None, None]+ 1e-8)
+        
         diff = depth_pred - depth_gt
         
         x_grad_gt = depth_gt[:,:,:, 0:-2] - depth_gt[:,:,:, 2:]
@@ -338,22 +346,32 @@ class ssitrim_reg():
     def __call__(self, depth_pred_, depth_gt_, valid_mask=None):
         t_pr = torch.median(depth_pred_.flatten(start_dim=-2), dim=-1).values
         s_pr = torch.abs((depth_pred_ - t_pr[:, :, None, None])).mean((-1,-2))
-        depth_pred = (depth_pred_ - t_pr[:, :, None, None]) / s_pr[:, :, None, None]
+        depth_pred = (depth_pred_ - t_pr[:, :, None, None]) / (s_pr[:, :, None, None]+ 1e-8)
         t_gt = torch.median(depth_gt_.flatten(start_dim=-2), dim=-1).values
         s_gt = torch.abs((depth_gt_ - t_gt[:, :, None, None])).mean((-1,-2))
-        depth_gt = (depth_gt_ - t_gt[:, :, None, None]) / s_gt[:, :, None, None]
+        depth_gt = (depth_gt_ - t_gt[:, :, None, None]) / (s_gt[:, :, None, None]+ 1e-8)
+        
+        gt = depth_gt.clone()
+        pred = depth_pred.clone() 
         
         diff = depth_pred - depth_gt
+        
         if valid_mask is not None:
             diff[~valid_mask] = 0
             n = valid_mask.sum((-1, -2))
+            gt[~valid_mask] = 0
+            pred[~valid_mask] = 0 
         else:
             n = depth_gt.shape[-2] * depth_gt.shape[-1]     
         abs_diff = torch.abs(diff)
         sorted, _ = torch.sort(abs_diff.flatten(start_dim=-2))
         m = (n * self.cutoff).int()
-        for i, lim in enumerate(m):
-            sorted[i][0][-lim:] = 0
+        
+        # for i, lim in enumerate(m):
+        #     sorted[i][0][-lim:] = 0
+        
+        sorted[:,:,-m.min():] = 0
+        
         img_loss = torch.sum(sorted, dim=-1) / n
         loss = (img_loss / 2).mean()
 
@@ -365,5 +383,11 @@ class ssitrim_reg():
             valid_mask = valid_mask[:,:,::step,::step]
             grad_term += self.single_scale_grad_loss(depth_pred, depth_gt, valid_mask)
         
-        final_loss = loss + self.alpha * grad_term
+ 
+        (std_gt, mean_gt) = torch.std_mean(gt,dim=(-1,-2))
+        (std_pred, mean_pred) = torch.std_mean(pred,dim=(-1,-2))
+        ssim = (2*mean_pred*mean_gt + 1.0e-08)*(2*std_pred*std_gt + 1.0e-08)/((mean_pred*mean_pred + mean_gt*mean_gt + 1.0e-08)*(std_pred*std_pred + std_gt*std_gt + 1.0e-08))
+        loss_ssim = (1 - 0.5 * ssim).mean()
+        
+        final_loss = loss + self.alpha * grad_term + loss_ssim
         return final_loss
