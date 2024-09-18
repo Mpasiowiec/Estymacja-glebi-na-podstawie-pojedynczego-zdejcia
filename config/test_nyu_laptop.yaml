@@ -24,19 +24,20 @@ model:
   backbone: resnet101
 
 loss:
-  name: com_loss
+  name: ssitrim_reg
   kwargs:
-    batch_reduction: True 
+     alpha: 0.5
+     scale_lv: 4
 
 optimizer:
-  name: AdamW
+  name: Adam
 
 lr_pretrained: 1.0e-05
-lr_scratch: 5.0e-05
+lr_scratch: 1.0e-04
 
 lr_scheduler:
   kwargs:
-    factor: 0.2
+    factor: 0.9
     patience: 1
     min_lr: 3.0e-07
     threshold: 0.0001

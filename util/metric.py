@@ -16,7 +16,7 @@ class MetricMonitor:
     def update(self, metric_name, val, count):
         metric = self.metrics[metric_name]
 
-        metric["val"] += val
+        metric["val"] += val * count
         metric["count"] += count
         metric["avg"] = metric["val"] / metric["count"]
     
