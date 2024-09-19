@@ -21,7 +21,7 @@ epochs_num: 2  # a large enough number
 
 model:
   name: MiDas
-  backbone: resnext101_wsl
+  backbone: resnet101
 
 # loss:
 #   name: com_loss

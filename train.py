@@ -111,6 +111,7 @@ if "__main__" == __name__:
     out_dir_dic = {
         'ckpt'  : os.path.join(out_dir_run, "checkpoint"),
         'rec' : os.path.join(out_dir_run, "records"),
+        'img' : os.path.join(out_dir_run, "img"),
     }
     for key in out_dir_dic.keys():
         if not os.path.exists(out_dir_dic[key]):

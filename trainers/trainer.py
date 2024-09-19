@@ -123,12 +123,11 @@ class NetTrainer:
                         self.in_evaluation = False
                         continue
                     self.model.train()
-                    stream = tqdm(skip_first_batches(self.dataloaders[phase], self.n_batch_in_epoch))
+                    stream = tqdm(skip_first_batches(self.dataloaders[phase], self.n_batch_in_epoch), position=0, leave=True)
                 else:
                     self.model.eval()
-                    stream = tqdm(skip_first_batches(self.dataloaders[phase], 0))
-                
-                stream = tqdm(skip_first_batches(self.dataloaders[phase], self.n_batch_in_epoch if phase == 'train' else 0))
+                    stream = tqdm(skip_first_batches(self.dataloaders[phase], 0), position=0, leave=True)
+                    
                 for batch in stream:
                     
                     images = batch['rgb_img'].to(device, non_blocking=True)
@@ -193,13 +192,14 @@ class NetTrainer:
                             self.optimizer.step()
                             self.n_batch_in_epoch += 1
                             self.effective_iter += 1
-                            if self.effective_iter%(len(self.dataloaders[phase])//4) == 0:
+                            if self.effective_iter%100 == 0:
                                 logging.debug(
                                     f"iter {self.effective_iter:5d} epoch [{epoch:2d}/{self.epochs_num:2d}]: loss={self.metric_monitors[phase].metrics['loss']['avg']:.5f}"
                                     )
                                 logging.debug(
                                     f'lr {self.lr_scheduler.get_last_lr()}, n_batch_in_epoch ({self.n_batch_in_epoch}/{len(self.dataloaders[phase])})'
                                     )
+
 
                     _is_latest_saved = False        
                     if (
@@ -220,7 +220,7 @@ class NetTrainer:
                     stream.set_description(
                       f"{phase}: {self.metric_monitors[phase]}"
                       )
-                    
+
                     torch.cuda.empty_cache()
 
                 for metric_name in self.metric_monitors[phase].metrics:
@@ -243,20 +243,20 @@ class NetTrainer:
                     
                 self.metric_monitors[phase].reset()
                 
-                self.save_checkpoint(ckpt_name='latest', save_train_state=True)               
-                
+                self.save_checkpoint(ckpt_name='latest', save_train_state=True) 
+
+            if phase == 'val':
+                f, ax = plt.subplots( nrows=1, ncols=3 )
+                # f.set_figheight(6)
+                # f.set_figwidth(15)
+                ax[0].imshow(np.clip((batch['rgb_img'][0].numpy()+1)/2, a_min=0, a_max=1).transpose(1,2,0))
+                ax[1].imshow(batch['depth_raw_linear'][0][0])
+                ax[2].imshow(output[0][0].detach().cpu())
+                f.savefig(self.out_dir_dic['img']+f'/{self.epoch}_{self.n_batch_in_epoch}.png')   # save the figure to file
+                plt.close(f)
+
             self.n_batch_in_epoch = 0
                 
-            if phase == 'val':
-                            f, ax = plt.subplots( nrows=1, ncols=3 )  # create figure & 1 axis
-                            f.set_figheight(6)
-                            f.set_figwidth(15)
-                            ax[0].imshow(np.clip((batch['rgb_img'][0].numpy()+1)/2, a_min=0, a_max=1).transpose(1,2,0))
-                            ax[1].imshow(batch['depth_raw_linear'][0][0])
-                            ax[2].imshow(output[0][0].detach().cpu())
-                            f.savefig(self.out_dir_dic['img']+f'/{self.epoch}_{self.n_batch_in_epoch}.png')   # save the figure to file
-                            plt.close(f)   
-                             
         time_elapsed = (datetime.now() - train_start).total_seconds()      
         logging.info(f'Training ended. Training time: {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
 

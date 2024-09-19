@@ -28,16 +28,16 @@ model:
 #   kwargs:
 #     batch_reduction: True 
 loss:
-  name: ssitrim_reg_ssim
+  name: ssitrim_reg
   kwargs:
      alpha: 0.5
      scale_lv: 4
 
 optimizer:
-  name: Adam
+  name: AdamW
 
-lr_pretrained: 3.0e-05
-lr_scratch: 3.0e-04
+lr_pretrained: 1.0e-05
+lr_scratch: 9.0e-05
 
 lr_scheduler:
   kwargs:

@@ -42,7 +42,7 @@ def get_dataset(
         gt_depth_type, **kwargs
 ) -> BaseDepthDataset:
     if "mixed" == cfg_data_split.name:
-        assert DatasetMode.TRAIN == mode, "Only training mode supports mixed datasets."
+        # assert DatasetMode.TRAIN == mode, "Only training mode supports mixed datasets."
         dataset_ls = [
             get_dataset(_cfg, base_data_dir, mode, gt_depth_type, **kwargs)
             for _cfg in cfg_data_split.dataset_list

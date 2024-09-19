@@ -28,16 +28,16 @@ model:
 #   kwargs:
 #     batch_reduction: True 
 loss:
-  name: ssitrim_reg_ssim
+  name: ssitrim_reg
   kwargs:
      alpha: 0.5
      scale_lv: 4
 
 optimizer:
-  name: Adam
+  name: AdamW
 
-lr_pretrained: 3.0e-05
-lr_scratch: 3.0e-04
+lr_pretrained: 1.0e-05
+lr_scratch: 9.0e-05
 
 lr_scheduler:
   kwargs:
@@ -70,7 +70,7 @@ eval:
 dataset:
   train:
     name: mixed
-    prob_ls: [0.9, 0.1]
+    prob_ls: [0.2, 0.8]
     dataset_list:
     - name: hypersim
       disp_name: hypersim_train
@@ -92,7 +92,7 @@ dataset:
       - 544
   val:
     name: mixed
-    prob_ls: [0.9, 0.1]
+    prob_ls: [0.2, 0.8]
     dataset_list:
     - name: hypersim
       disp_name: hypersim_val
