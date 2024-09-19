@@ -46,7 +46,7 @@ class MixedBatchSampler(BatchSampler):
         self.n_dataset = len(self.src_dataset_ls)
 
         # Dataset length
-        self.dataset_length = [len(ds) for ds in self.src_dataset_ls]
+        self.dataset_length = [len(ds)/2 for ds in self.src_dataset_ls]
         self.cum_dataset_length = [
             sum(self.dataset_length[:i]) for i in range(self.n_dataset)
         ]  # cumulative dataset length

@@ -17,7 +17,7 @@ trainer:
 gt_depth_type: depth_raw_linear
 gt_mask_type: valid_mask_raw
 
-epochs_num: 2  # a large enough number
+epochs_num: 1  # a large enough number
 
 model:
   name: MiDas
