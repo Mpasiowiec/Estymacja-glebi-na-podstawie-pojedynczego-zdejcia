@@ -5,8 +5,8 @@ dataloader:
   num_workers: 8
   pin_memory: true
   train_batch_size: 20
-  val_batch_size: 20
-  test_batch_size: 2
+  val_batch_size: 1
+  test_batch_size: 1
   seed: 2024  # to ensure continuity when resuming from checkpoint
 
 # Training settings
@@ -17,27 +17,34 @@ trainer:
 gt_depth_type: depth_raw_linear
 gt_mask_type: valid_mask_raw
 
-epochs_num: 5  # a large enough number
+epochs_num: 2  # a large enough number
 
 model:
   name: MiDas
   backbone: resnext101_wsl
 
+# loss:
+#   name: com_loss
+#   kwargs:
+#     batch_reduction: True 
 loss:
-  name: com_loss
+  name: ssitrim_reg_ssim
   kwargs:
-    batch_reduction: True 
+     alpha: 0.5
+     scale_lv: 4
 
 optimizer:
-  name: AdamW
+  name: Adam
 
 lr_pretrained: 3.0e-05
-lr_scratch: 3.0e-03
+lr_scratch: 3.0e-04
 
 lr_scheduler:
-  factor: 0.2
-  patience: 2
-  min_lr: 3.0e-07
+  kwargs:
+    factor: 0.9
+    patience: 1
+    min_lr: 3.0e-07
+    threshold: 0.0001
 
 # Validation settings
 validation:
@@ -144,12 +151,12 @@ dataset:
       - 256
       - 352
       
-depth_normalization:
-  type: scale_shift_depth
-  clip: true
-  norm_min: 0.000001
-  norm_max: 1.0
-  min_max_quantile: 0.01
+# depth_normalization:
+#   type: scale_shift_depth
+#   clip: true
+#   norm_min: -1
+#   norm_max: 1
+#   min_max_quantile: 0.02
 
 augmentation_args:
   random_horizontal_flip:

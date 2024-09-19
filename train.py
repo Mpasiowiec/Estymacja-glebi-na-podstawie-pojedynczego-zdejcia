@@ -17,10 +17,10 @@ from datasets.mixed_sampler import MixedBatchSampler
 from trainers.trainer import NetTrainer
 from util.config_util import recursive_load_config
 
-from util.depth_transform import (
-    DepthNormalizerBase,
-    get_depth_normalizer,
-)
+# from util.depth_transform import (
+#     DepthNormalizerBase,
+#     get_depth_normalizer,
+# )
 from util.logging_util import config_logging
 
 if "__main__" == __name__:
@@ -148,15 +148,15 @@ if "__main__" == __name__:
         loader_generator = torch.Generator().manual_seed(loader_seed)
 
     # Training dataset
-    depth_transform: DepthNormalizerBase = get_depth_normalizer(
-        cfg_normalizer=cfg.depth_normalization
-    )
+    # depth_transform: DepthNormalizerBase = get_depth_normalizer(
+    #     cfg_normalizer=cfg.depth_normalization
+    # )
     train_dataset: BaseDepthDataset = get_dataset(
         cfg.dataset.train,
         base_data_dir=base_data_dir,
         mode=DatasetMode.TRAIN,
         augmentation_args=cfg.augmentation_args,
-        depth_transform=depth_transform,
+        # depth_transform=depth_transform,
         gt_depth_type=cfg.gt_depth_type
     )
     
@@ -194,7 +194,7 @@ if "__main__" == __name__:
         cfg.dataset.val,
         base_data_dir=base_data_dir,
         mode=DatasetMode.EVAL,
-        depth_transform=depth_transform,
+        # depth_transform=depth_transform,
         gt_depth_type=cfg.gt_depth_type
     )
     if "mixed" == cfg.dataset.val.name:
@@ -233,7 +233,7 @@ if "__main__" == __name__:
             _test_dic,
             base_data_dir=base_data_dir,
             mode=DatasetMode.EVAL,
-            depth_transform=depth_transform,
+            # depth_transform=depth_transform,
             gt_depth_type=cfg.gt_depth_type
         )
         _test_loader = DataLoader(

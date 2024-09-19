@@ -115,7 +115,7 @@ class BaseDepthDataset(Dataset):
         ])
 
         # training arguments
-        self.depth_transform: DepthNormalizerBase = depth_transform
+        self.depth_transform: Union[DepthNormalizerBase, None] = depth_transform
         self.augm_args = augmentation_args
         self.resize_to_hw = resize_to_hw
         self.rgb_transform = rgb_transform
@@ -136,9 +136,10 @@ class BaseDepthDataset(Dataset):
             rasters = self._training_preprocess(rasters)
         else:
             # Normalization
-            rasters["depth_raw_norm"] = self.depth_transform(
-                rasters["depth_raw_linear"], rasters["valid_mask_raw"]
-            ).clone()
+            if self.depth_transform is not None:
+                rasters["depth_raw_norm"] = self.depth_transform(
+                    rasters["depth_raw_linear"], rasters["valid_mask_raw"]
+                ).clone()
             rasters = {k: self.trans(v) if k == "rgb_img" else v for k, v in rasters.items()}
             # Resize
             if self.resize_to_hw is not None:
@@ -251,9 +252,10 @@ class BaseDepthDataset(Dataset):
     def _training_preprocess(self, rasters):
         
         # Normalization
-        rasters["depth_raw_norm"] = self.depth_transform(
-            rasters["depth_raw_linear"], rasters["valid_mask_raw"]
-        ).clone()
+        if self.depth_transform is not None:
+            rasters["depth_raw_norm"] = self.depth_transform(
+                rasters["depth_raw_linear"], rasters["valid_mask_raw"]
+            ).clone()
         
         # Augmentation
         if self.augm_args is not None:

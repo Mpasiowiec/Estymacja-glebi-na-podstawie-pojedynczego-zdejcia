@@ -1,53 +1,45 @@
+logging:
+  filename: logging.log
+  format: ' %(asctime)s - %(levelname)s -%(filename)s - %(funcName)s >> %(message)s'
+  console_level: 20
+  file_level: 10
 base_config:
 - config/logging.yaml
-
 dataloader:
   num_workers: 0
   pin_memory: true
   train_batch_size: 8
   val_batch_size: 1
   test_batch_size: 1
-  seed: 2024  # to ensure continuity when resuming from checkpoint
-
-# Training settings
+  seed: 2024
 trainer:
-  init_seed: 2024  # use null to train w/o seeding
+  init_seed: 2024
   save_period: 0
-
 gt_depth_type: depth_raw_linear
 gt_mask_type: valid_mask_raw
-
-epochs_num: 10  # a large enough number
-
+epochs_num: 10
 model:
   name: MiDas
   backbone: resnet101
-
 loss:
-  name: ssitrim_reg
+  name: ssi_reg
   kwargs:
-     alpha: 0.5
-     scale_lv: 4
-
+    alpha: 0.5
+    scale_lv: 4
 optimizer:
-  name: Adam
-
+  name: AdamW
 lr_pretrained: 1.0e-05
-lr_scratch: 1.0e-04
-
+lr_scratch: 9.0e-05
 lr_scheduler:
   kwargs:
     factor: 0.9
     patience: 1
     min_lr: 3.0e-07
     threshold: 0.0001
-
-# Validation settings
 validation:
   main_val_metric: abs_relative_difference
   main_val_metric_goal: min
   init_seed: 2024
-
 eval:
   alignment: least_square
   align_max_res: null
@@ -62,7 +54,6 @@ eval:
   - delta3_acc
   - i_rmse
   - silog_rmse
-
 dataset:
   train:
     name: nyu_v2
@@ -85,23 +76,15 @@ dataset:
     - 128
     - 128
   test:
-    - name: nyu_v2
-      disp_name: nyu_v2
-      dir: nyu_v2
-      filenames: data_split/nyu_2_paths_test.txt
-      eigen_valid_mask: true
-      norm_name: nyu
-      resize_to_hw:
-      - 384
-      - 384
-
-# depth_normalization:
-#   type: scale_shift_depth
-#   clip: true
-#   norm_min: -1
-#   norm_max: 1
-#   min_max_quantile: 0.02
-
+  - name: nyu_v2
+    disp_name: nyu_v2
+    dir: nyu_v2
+    filenames: data_split/nyu_2_paths_test.txt
+    eigen_valid_mask: true
+    norm_name: nyu
+    resize_to_hw:
+    - 384
+    - 384
 augmentation_args:
   random_horizontal_flip:
     in_use: true
