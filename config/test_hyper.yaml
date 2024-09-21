@@ -17,11 +17,11 @@ trainer:
 gt_depth_type: depth_raw_linear
 gt_mask_type: valid_mask_raw
 
-epochs_num: 2  # a large enough number
+epochs_num: 10  # a large enough number
 
 model:
   name: MiDas
-  backbone: resnext101_wsl
+  backbone: resnet101
 
 # loss:
 #   name: com_loss

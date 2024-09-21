@@ -115,7 +115,7 @@ class NetTrainer:
             
             for phase in ['train', 'val']:
                 
-                self.model_datas[phase].at[self.epoch-1, 'epoch'] = self.epoch
+                self.model_datas[phase].at[self.epoch, 'epoch'] = self.epoch
                 
                 if phase == 'train':
                     if self.in_evaluation:
@@ -156,7 +156,7 @@ class NetTrainer:
                               )
                         
                           # Clip to dataset min max
-                          if type(self.dataloaders[phase]).__name__ == 'ConcatDataset':
+                          if type(self.dataloaders['train'].dataset).__name__ == 'ConcatDataset':
                             output_alig = np.clip(
                                 output_alig,
                                 a_min=self.dataloaders[phase].dataset.datasets[0].min_depth,
@@ -224,7 +224,7 @@ class NetTrainer:
                     torch.cuda.empty_cache()
 
                 for metric_name in self.metric_monitors[phase].metrics:
-                    self.model_datas[phase].at[self.epoch-1, metric_name] = self.metric_monitors[phase].metrics[metric_name]['avg']
+                    self.model_datas[phase].at[self.epoch, metric_name] = self.metric_monitors[phase].metrics[metric_name]['avg']
                 self.model_datas[phase].to_csv(os.path.join(self.out_dir_dic['rec'], phase+'_record.csv'), index=False)
 
                 if phase == 'train':
