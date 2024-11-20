@@ -244,6 +244,7 @@ class NetTrainer:
                 self.metric_monitors[phase].reset()
                 
                 self.save_checkpoint(ckpt_name='latest', save_train_state=True) 
+                logging.info(f'{phase}: {self.metric_monitors[phase]}')
 
             if phase == 'val':
                 f, ax = plt.subplots( nrows=1, ncols=3 )
@@ -254,9 +255,8 @@ class NetTrainer:
                 ax[2].imshow(output[0][0].detach().cpu())
                 f.savefig(self.out_dir_dic['img']+f'/{self.epoch}_{self.n_batch_in_epoch}.png')   # save the figure to file
                 plt.close(f)
-
+                
             self.n_batch_in_epoch = 0
-            logging.info(f"{phase}: {self.metric_monitors[phase]}")
                 
         time_elapsed = (datetime.now() - train_start).total_seconds()      
         logging.info(f'Training ended. Training time: {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
@@ -349,8 +349,8 @@ class NetTrainer:
         
         if os.path.exists(os.path.join(self.out_dir_dic['rec'],'train_record.csv')):
           self.model_datas['train'] = pd.read_csv(os.path.join(self.out_dir_dic['rec'],'train_record.csv'))
-        if os.path.exists(os.path.join(self.out_dir_dic['rec'],'eval_record.csv')):
-            self.model_datas['val'] = pd.read_csv(os.path.join(self.out_dir_dic['rec'],'eval_record.csv'))
+        if os.path.exists(os.path.join(self.out_dir_dic['rec'],'val_record.csv')):
+            self.model_datas['val'] = pd.read_csv(os.path.join(self.out_dir_dic['rec'],'val_record.csv'))
         logging.info(
             f'Checkpoint loaded from: {ckpt_path}. Resume from iteration {self.effective_iter} (epoch {self.epoch})'
         )
