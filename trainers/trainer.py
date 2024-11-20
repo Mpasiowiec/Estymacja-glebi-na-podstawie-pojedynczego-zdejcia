@@ -256,6 +256,7 @@ class NetTrainer:
                 plt.close(f)
 
             self.n_batch_in_epoch = 0
+            logging.info(f"{phase}: {self.metric_monitors[phase]}")
                 
         time_elapsed = (datetime.now() - train_start).total_seconds()      
         logging.info(f'Training ended. Training time: {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')

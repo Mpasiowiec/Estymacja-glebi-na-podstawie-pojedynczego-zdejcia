@@ -177,3 +177,11 @@ augmentation_args:
   red_green_channel_swap:
     in_use: true
     p: 0.5
+
+
+depth_normalization:
+  type: scale_shift_depth
+  clip: true
+  norm_min: -1.0
+  norm_max: 1.0
+  min_max_quantile: 0.02
