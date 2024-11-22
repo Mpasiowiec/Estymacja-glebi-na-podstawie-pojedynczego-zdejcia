@@ -116,6 +116,11 @@ if "__main__" == __name__:
     for key in out_dir_dic.keys():
         if not os.path.exists(out_dir_dic[key]):
             os.makedirs(out_dir_dic[key])
+            if key == "img":
+                os.makedirs(os.path.join(out_dir_dic[key], "nyu_v2"))
+                os.makedirs(os.path.join(out_dir_dic[key], "hypersim"))
+                os.makedirs(os.path.join(out_dir_dic[key], "kitti"))
+                os.makedirs(os.path.join(out_dir_dic[key], "vkitti2"))
 
     # -------------------- Logging settings --------------------
     config_logging(cfg.logging, out_dir=out_dir_run)

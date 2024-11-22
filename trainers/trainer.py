@@ -240,21 +240,23 @@ class NetTrainer:
                         self.best_model = copy.deepcopy(self.model.state_dict())
                     
                     self.in_evaluation = False
-                    
+                
+                # text = str(self.metric_monitors[phase])
+                logging.info(f'{phase}: {self.metric_monitors[phase]}')    
                 self.metric_monitors[phase].reset()
                 
-                self.save_checkpoint(ckpt_name='latest', save_train_state=True) 
-                logging.info(f'{phase}: {self.metric_monitors[phase]}')
+                self.save_checkpoint(ckpt_name='latest', save_train_state=True)
 
             if phase == 'val':
-                f, ax = plt.subplots( nrows=1, ncols=3 )
-                # f.set_figheight(6)
-                # f.set_figwidth(15)
-                ax[0].imshow(np.clip((batch['rgb_img'][0].numpy()+1)/2, a_min=0, a_max=1).transpose(1,2,0))
-                ax[1].imshow(batch['depth_raw_linear'][0][0])
-                ax[2].imshow(output[0][0].detach().cpu())
-                f.savefig(self.out_dir_dic['img']+f'/{self.epoch}_{self.n_batch_in_epoch}.png')   # save the figure to file
-                plt.close(f)
+              for iii in ['hypersim', 'kitti', 'nyu_v2', 'vkitti2']:
+                load_tensor = torch.load('/content/drive/MyDrive/magisterka/Estymacja-glebi-na-podstawie-pojedynczego-zdejcia/wiz/'+iii+'.pt')['rgb_img']
+                tensor_to_save = self.model(load_tensor.unsqueeze(0).to(self.device))
+                del load_tensor
+                torch.save(tensor_to_save, self.out_dir_dic['img']+f'/{iii}/{iii}_{self.epoch}_{self.n_batch_in_epoch}.pt')
+                plt.imshow(tensor_to_save.cpu().detach().numpy()[0][0])
+                del tensor_to_save
+                plt.savefig(self.out_dir_dic['img']+f'/{iii}/{iii}_{self.epoch}_{self.n_batch_in_epoch}.png')   # save the figure to file
+                plt.close()
                 
             self.n_batch_in_epoch = 0
                 
