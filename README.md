@@ -1,6 +1,6 @@
 # Monocular Depth Estimation from a Single Image
 
-This repository contains code and experiments for monocular depth estimation using deep convolutional neural networks, as described in the accompanying master's thesis. The project explores the use of both synthetic and real-world datasets, advanced data augmentation, and state-of-the-art neural architectures to predict depth maps from single RGB images.
+This repository contains code and experiments for monocular depth estimation using deep convolutional neural networks. The project explores the use of both synthetic and real-world datasets, advanced data augmentation, and state-of-the-art neural architectures to predict depth maps from single RGB images.
 
 ## Project Overview
 
