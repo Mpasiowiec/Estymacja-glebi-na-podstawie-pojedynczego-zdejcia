@@ -95,15 +95,10 @@ python train.py --config config/resnext101_wsl_mixed.yaml --output_dir ./output
 
 Below is an example of data augmentation techniques used in the project:
 
-![Example of data augmentation](./augmentation_example.jpg)
+![Example of data augmentation](./img/augm.png)
 *Figure: a) Original image, b) Horizontal flip, c) Red-green channel swap, d) Random color adjustment, e) Vertical CutDepth.*
 
-## Example Depth Estimation Results
+## Epoch improvement visualization
 
-The following figures show example depth maps predicted by the trained models on KITTI and NYU Depth v2 test images:
-
-![KITTI depth estimation results](./kitti_depth_results.jpg)
-*Figure: Example depth maps for a KITTI test image. Each row/column corresponds to a different model or epoch.*
-
-![NYU Depth v2 depth estimation results](./nyu_depth_results.jpg)
-*Figure: Example depth maps for a NYU Depth v2 test image. Each row/column corresponds to a different model or epoch.*
+![Epoch improvement visualization](./img/epok_progres.png)
+*Figure: A comparison of sample images from the KITTI and NYU Depth v2 datasets with the depth maps predicted by the networks after individual training epochs. The models were trained respectively on mixed data and on the Hypersim dataset.*
